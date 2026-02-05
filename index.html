@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>King Snake Royale</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260205">
     <link rel="stylesheet" href="levels.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="vehicle.js"></script>
@@ -14,6 +14,7 @@
     <script src="toxicSnake.js"></script>
     <script src="food.js"></script>
     <script src="snake.js"></script>
+    <script src="bossRenderer.js"></script>
     <script src="tutorial.js"></script>
     <script src="sketch.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
@@ -95,6 +96,19 @@
             <div class="boss-actions">
                 <button id="boss-back-btn" class="menu-btn test-btn back pulse-low">BACK TO COMMAND HUB ⬅️</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu" class="overlay hidden">
+        <div class="modal-content pause-modal">
+            <h2>⏸️ PAUSED</h2>
+            <div class="pause-actions">
+                <button id="resume-btn" class="modal-btn yellow">▶️ Resume</button>
+                <button id="pause-restart-btn" class="modal-btn cyan">🔄 Restart</button>
+                <button id="pause-exit-btn" class="modal-btn red">🚪 Exit to Menu</button>
+            </div>
+            <div class="pause-hint">Press ESC to resume</div>
         </div>
     </div>
 

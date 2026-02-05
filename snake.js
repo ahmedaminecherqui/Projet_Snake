@@ -15,6 +15,12 @@ class Snake extends Vehicle {
         // Tongue animation state
         this.tongueActive = false;
         this.tongueTimer = 0;
+
+        // Dash Mechanic State
+        this.isDashing = false;
+        this.dashTimer = 0;
+        this.dashCooldown = 0;
+        this.ghostHistory = []; // Stores full body snapshots for the trail
     }
 
     addSegment() {
@@ -62,6 +68,26 @@ class Snake extends Vehicle {
             head.maxSpeed = 8;
             head.maxForce = 0.8;
 
+            // --- DASH OVERRIDE ---
+            if (this.dashTimer > 0) {
+                this.isDashing = true;
+                head.maxSpeed = 22; // Elite burst speed
+                head.maxForce = 1.5;
+                this.dashTimer--;
+
+                // Store ghost snapshot every 3 frames for performance
+                if (frameCount % 3 === 0) {
+                    let snapshot = this.segments.map(s => s.position.copy());
+                    this.ghostHistory.push(snapshot);
+                    if (this.ghostHistory.length > 5) this.ghostHistory.shift();
+                }
+            } else {
+                this.isDashing = false;
+                this.ghostHistory = []; // Clear trail when not dashing
+            }
+
+            if (this.dashCooldown > 0) this.dashCooldown--;
+
             // Normal player-controlled behavior
             let arriveForce = head.arrive(target, 100);
             let avoidForce = head.avoid(obstacles);
@@ -87,14 +113,55 @@ class Snake extends Vehicle {
         for (let i = 1; i < this.segments.length; i++) {
             let segment = this.segments[i];
             let prev = this.segments[i - 1];
+
+            // 1. Physics Movement
             // Reduce stopDistance to 12 to ensure 16px radius segments overlap (8+8=16 > 12)
             let arriveForce = segment.arrive(prev.position, 40, 12);
             segment.applyForce(arriveForce);
             segment.update();
+
+            // 2. HARD CONSTRAINT (Fixes gaps/detaching)
+            // If segment is too far, pull it back instantly
+            let dist = p5.Vector.dist(segment.position, prev.position);
+            const MAX_DIST = 14;
+            if (dist > MAX_DIST) {
+                let dir = p5.Vector.sub(segment.position, prev.position);
+                dir.setMag(MAX_DIST); // Clamp to max distance
+                segment.position = p5.Vector.add(prev.position, dir);
+                segment.velocity.mult(0.9); // Dampen velocity to prevent snapping oscillation
+            }
         }
     }
 
+    dash() {
+        if (this.dashCooldown <= 0) {
+            this.dashTimer = 45; // Extended duration (0.75s)
+            this.dashCooldown = 90; // 1.5s cooldown
+            return true;
+        }
+        return false;
+    }
+
     display(mascotImg) {
+        // --- GHOST TRAIL (Full Body Echo) ---
+        if (this.isDashing && this.ghostHistory && this.ghostHistory.length > 0) {
+            push();
+            noStroke();
+            drawingContext.shadowBlur = 20;
+            drawingContext.shadowColor = color(74, 222, 128);
+
+            for (let i = 0; i < this.ghostHistory.length; i++) {
+                let snapshot = this.ghostHistory[i];
+                let opacity = map(i, 0, this.ghostHistory.length, 50, 150);
+                fill(74, 222, 128, opacity); // Neon Green Ghost
+
+                for (let pos of snapshot) {
+                    ellipse(pos.x, pos.y, 20); // slightly smaller segments
+                }
+            }
+            pop();
+        }
+
         this.segments[0].drawDebug();
         // Draw tail-to-head so the head sits on top
         for (let i = this.segments.length - 1; i >= 0; i--) {

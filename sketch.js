@@ -7,6 +7,8 @@ let menuSnake;
 let score = 0;
 let topScore = 0;
 let gameOver = false;
+let currentBoss = null; // Track active boss for exclusive mechanics
+let bossRenderer; // Handles boss environment visuals
 
 // Assets
 let mascotImg;
@@ -16,6 +18,7 @@ let foodIconsImg;
 // Game States
 const START = 'START';
 const PLAYING = 'PLAYING';
+const PAUSED = 'PAUSED';
 const GAMEOVER = 'GAMEOVER';
 const COMPLETING = 'COMPLETING';
 let gameState = START;
@@ -54,9 +57,9 @@ const levelProgression = {
         { level: 3, name: 'Hard 3', targetScore: 80, timeLimit: 45, isTutorial: false, description: '' }
     ],
     expert: [
-        { level: 1, name: 'Expert 1', targetScore: 60, timeLimit: 50, isTutorial: false, description: '' },
-        { level: 2, name: 'Expert 2', targetScore: 100, timeLimit: 45, isTutorial: false, description: '' },
-        { level: 3, name: 'Expert 3', targetScore: 150, timeLimit: 40, isTutorial: false, description: '' }
+        { level: 1, name: 'The Flame Serpent', targetScore: 50, timeLimit: 0, isTutorial: false, description: 'Survive the Inferno', bossId: 'flame-serpent' },
+        { level: 2, name: 'Froggy', targetScore: 100, timeLimit: 45, isTutorial: false, description: '' },
+        { level: 3, name: 'Sophia', targetScore: 150, timeLimit: 40, isTutorial: false, description: '' }
     ],
     test: [
         { level: 1, name: 'Test Arena', targetScore: 9999, timeLimit: 0, isTutorial: false, description: 'Autonomous sandbox mode' }
@@ -144,6 +147,7 @@ function setup() {
     if (testBtn) testBtn.addEventListener('click', () => {
         currentDifficultyLevel = 'test';
         currentLevel = 1;
+        currentBoss = null; // Reset boss state
         startGame();
     });
 
@@ -172,6 +176,7 @@ function setup() {
             // Set difficulty to a special boss mode
             currentDifficultyLevel = 'expert';
             currentLevel = 1;
+            currentBoss = bossType; // Activate exclusive boss mechanics
 
             bossMenu.classList.add('hidden');
             document.getElementById('game-ui').classList.remove('hidden');
@@ -187,6 +192,43 @@ function setup() {
 
     menuSnake = new Snake(width / 2, height / 2);
     for (let i = 0; i < 15; i++) menuSnake.addSegment();
+
+    // Initialize Boss Renderer
+    bossRenderer = new BossRenderer();
+
+    // Pause Menu Event Listeners
+    const pauseMenu = document.getElementById('pause-menu');
+    const resumeBtn = document.getElementById('resume-btn');
+    const pauseRestartBtn = document.getElementById('pause-restart-btn');
+    const pauseExitBtn = document.getElementById('pause-exit-btn');
+
+    if (resumeBtn) resumeBtn.addEventListener('click', () => {
+        resumeGame();
+    });
+
+    if (pauseRestartBtn) pauseRestartBtn.addEventListener('click', () => {
+        resumeGame();
+        resetGame();
+    });
+
+    if (pauseExitBtn) pauseExitBtn.addEventListener('click', () => {
+        resumeGame();
+        gameState = START;
+        currentBoss = null;
+        document.getElementById('game-ui').classList.add('hidden');
+        document.getElementById('main-menu').classList.remove('hidden');
+    });
+
+    // ESC Key Handler for Pause
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (gameState === PLAYING) {
+                pauseGame();
+            } else if (gameState === PAUSED) {
+                resumeGame();
+            }
+        }
+    });
 }
 
 function startGame() {
@@ -214,6 +256,13 @@ function resetGame() {
     showTutorialOverlay = levelData.isTutorial;
     levelTimeLimit = levelData.timeLimit || 0;
 
+    // Initialize Boss Renderer if active
+    if (currentBoss) {
+        bossRenderer.init(currentBoss);
+    } else {
+        bossRenderer.stop();
+    }
+
     // In test mode, player snake is autonomous
     if (currentDifficultyLevel === 'test') {
         snake.isAutonomous = true;
@@ -229,6 +278,18 @@ function resetGame() {
     loop();
 }
 
+function pauseGame() {
+    if (gameState !== PLAYING) return;
+    gameState = PAUSED;
+    document.getElementById('pause-menu').classList.remove('hidden');
+}
+
+function resumeGame() {
+    if (gameState !== PAUSED) return;
+    gameState = PLAYING;
+    document.getElementById('pause-menu').classList.add('hidden');
+}
+
 function initFoods() {
     foods = [];
     const settings = difficultySettings[currentDifficultyLevel];
@@ -240,6 +301,9 @@ function initFoods() {
 
 function initToxicSnakes() {
     toxicSnakes = [];
+    // If we are fighting a boss, NO standard toxic snakes should spawn
+    if (currentBoss) return;
+
     const settings = difficultySettings[currentDifficultyLevel];
     for (let i = 0; i < settings.enemies; i++) {
         toxicSnakes.push(new ToxicSnake(random(width), random(height), settings.pursuit));
@@ -248,6 +312,9 @@ function initToxicSnakes() {
 
 function initObstacles() {
     obstacles = [];
+    // If we are fighting a boss, NO standard obstacles either (boss will have its own)
+    if (currentBoss) return;
+
     const settings = difficultySettings[currentDifficultyLevel];
     for (let i = 0; i < settings.obstacles; i++) {
         let obsPos;
@@ -264,28 +331,46 @@ function initObstacles() {
 }
 
 function draw() {
-    background(15, 23, 42);
-    if (backgroundImg && backgroundImg.width > 0) {
-        image(backgroundImg, 0, 0, width, height);
+    // 1. LAYER: BACKGROUND
+    if (currentBoss && (gameState === PLAYING || gameState === PAUSED)) {
+        bossRenderer.drawBackground();
+    } else {
+        background(15, 23, 42);
+        if (backgroundImg && backgroundImg.width > 0) {
+            image(backgroundImg, 0, 0, width, height);
+        }
     }
 
+    // 2. LAYER: GAME ENTITIES & LOGIC
     if (gameState === PLAYING && snake) {
         updateGame();
-
-        // Draw tutorial overlay on top after game updates
-        if (showTutorialOverlay) {
-            drawTutorialOverlay();
-        }
-
+    } else if (gameState === PAUSED && snake) {
+        // Render static game state when paused
+        for (let f of foods) f.display(foodIconsImg);
+        for (let o of obstacles) o.display();
+        for (let ts of toxicSnakes) ts.display();
+        if (snake) snake.display(mascotImg);
     } else if (gameState === COMPLETING) {
         updateCompleting();
     } else if (gameState === GAMEOVER) {
-        // Continue rendering particles during game-over for celebration effect
+        // Continue rendering particles
         if (particles) {
             particles.update();
             particles.display();
         }
-    } else if (gameState === START && menuSnake) {
+    }
+
+    // 3. LAYER: FOREGROUND (Boss Arena Rocks)
+    if (currentBoss && (gameState === PLAYING || gameState === PAUSED)) {
+        bossRenderer.drawForeground();
+    }
+
+    // 4. LAYER: UI / OVERLAYS
+    if (gameState === PLAYING && showTutorialOverlay) {
+        drawTutorialOverlay();
+    }
+
+    if (gameState === START && menuSnake) {
         updateMainMenu();
     }
 }
@@ -560,7 +645,10 @@ function updateGame() {
         // --- PROACTIVE COLLISION CHECK ---
         // Check collisions BEFORE updating position to prevent "bobbing" or penetration
         if (currentDifficultyLevel !== 'test') {
-            if (snake.checkSelfCollision() ||
+            // In boss mode, disable self-collision to allow more freedom of movement
+            let selfCollision = currentBoss ? false : snake.checkSelfCollision();
+
+            if (selfCollision ||
                 snake.checkObstacleCollision(obstacles) ||
                 snake.checkEnemyCollision(toxicSnakes)) {
                 triggerGameOver();
@@ -836,6 +924,16 @@ function setupLevelSelection() {
             } else {
                 btn.disabled = false;
             }
+
+            // Ensure boss mode is reset when clicking normal levels
+            btn.onclick = () => {
+                if (!btn.classList.contains('locked')) {
+                    currentDifficultyLevel = difficulty;
+                    currentLevel = level.level;
+                    currentBoss = null; // Clear boss state
+                    startGame();
+                }
+            };
         });
     });
 
@@ -866,6 +964,14 @@ function keyPressed() {
     if (key === 't' || key === 'T') {
         Vehicle.debug = !Vehicle.debug;
         console.log("Debug mode:", Vehicle.debug);
+    }
+
+    // BOSS ARENA EXCLUSIVE: DASH MECHANIC
+    if (key === ' ' && currentBoss !== null && gameState === PLAYING) {
+        if (snake && snake.dash()) {
+            // Dash successful
+            // We can add a sound effect here later
+        }
     }
 }
 
