@@ -147,6 +147,38 @@ function setup() {
         startGame();
     });
 
+    // --- BOSS ARENA MENU FLOW ---
+    const bossArenaBtn = document.getElementById('boss-arena-btn');
+    const bossMenu = document.getElementById('boss-menu');
+    const mainMenu = document.getElementById('main-menu');
+    const bossBackBtn = document.getElementById('boss-back-btn');
+
+    if (bossArenaBtn) bossArenaBtn.addEventListener('click', () => {
+        mainMenu.classList.add('hidden');
+        bossMenu.classList.remove('hidden');
+    });
+
+    if (bossBackBtn) bossBackBtn.addEventListener('click', () => {
+        bossMenu.classList.add('hidden');
+        mainMenu.classList.remove('hidden');
+    });
+
+    // Boss Selection Cards
+    document.querySelectorAll('.boss-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const bossType = card.getAttribute('data-boss');
+            console.log("Entering Boss Battle:", bossType);
+
+            // Set difficulty to a special boss mode
+            currentDifficultyLevel = 'expert';
+            currentLevel = 1;
+
+            bossMenu.classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            resetGame();
+        });
+    });
+
     // Level selection will be initialized when DOM is ready
 
     topScore = parseInt(localStorage.getItem('kingSnakeTopScore')) || 0;
