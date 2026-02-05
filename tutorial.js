@@ -1,12 +1,12 @@
 // Tutorial overlay and instructions for Level 1
 
 function drawTutorialOverlay() {
-    console.log('Drawing tutorial overlay...');
+    // console.log('Drawing tutorial overlay...');
     // Semi-transparent background
     push();
     fill(0, 0, 0, 200);
     rect(0, 0, width, height);
-    
+
     // Tutorial box (responsive)
     fill(22, 101, 52);
     stroke(74, 222, 128);
@@ -72,27 +72,12 @@ function drawTutorialOverlay() {
     textStyle(BOLD);
     textAlign(CENTER, CENTER);
     text('GOT IT! ➜', btnX + btnWidth / 2, btnY + btnHeight / 2);
-    
+
     pop();
-    
+
     // Store button coordinates for click detection
     window.tutorialBtnX = btnX;
     window.tutorialBtnY = btnY;
     window.tutorialBtnW = btnWidth;
     window.tutorialBtnH = btnHeight;
-}
-
-function mousePressed() {
-    if (showTutorialOverlay && window.tutorialBtnX !== undefined) {
-        if (mouseX > window.tutorialBtnX && mouseX < window.tutorialBtnX + window.tutorialBtnW &&
-            mouseY > window.tutorialBtnY && mouseY < window.tutorialBtnY + window.tutorialBtnH) {
-            showTutorialOverlay = false;
-            // Start the level timer now that the player dismissed the tutorial
-            if (typeof gameStartTime !== 'undefined') {
-                gameStartTime = millis();
-                timeElapsed = 0;
-            }
-            return false; // Prevent default behavior
-        }
-    }
 }

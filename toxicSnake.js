@@ -101,10 +101,24 @@ class ToxicSnake {
                 noStroke();
                 // Draw triangle with BASE at pivot (0,0) so it doesn't disconnect when turning
                 triangle(-12, 5, 12, 5, 0, -25);
-                // Eyes
+                // Eyes with Interactive Tracking
+                let mouseV = createVector(mouseX - this.segments[0].position.x, mouseY - this.segments[0].position.y);
+                mouseV.rotate(-angle); // Rotate to local head space
+                mouseV.normalize().mult(2); // Limit pupil movement within socket
+
                 fill(255);
-                ellipse(-5, -5, 5, 5);
-                ellipse(5, -5, 5, 5);
+                noStroke();
+                ellipse(-5, -5, 7, 7); // Socket L
+                ellipse(5, -5, 7, 7);  // Socket R
+
+                fill(0);
+                ellipse(-5 + mouseV.x, -5 + mouseV.y, 3, 3); // Pupil L
+                ellipse(5 + mouseV.x, -5 + mouseV.y, 3, 3);  // Pupil R
+
+                // Add tiny glowing pupil center
+                fill(168, 85, 247);
+                ellipse(-5 + mouseV.x, -5 + mouseV.y, 1, 1);
+                ellipse(5 + mouseV.x, -5 + mouseV.y, 1, 1);
                 // --- HUMONGOUS PURPLE TONGUE (FORKED LINE + V) ---
                 if (this.tongueActive && gameState !== COMPLETING) {
                     let flicker = map(sin(frameCount * 1.5), -1, 1, 0.7, 1.3);

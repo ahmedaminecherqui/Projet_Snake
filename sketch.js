@@ -840,6 +840,25 @@ function keyPressed() {
 let draggedObstacle = null;
 
 function mousePressed() {
+    // 1. Handle Tutorial Dismissal
+    if (showTutorialOverlay) {
+        console.log("Mouse Clicked at:", mouseX, mouseY);
+        console.log("Button Bounds:", window.tutorialBtnX, window.tutorialBtnY, window.tutorialBtnW, window.tutorialBtnH);
+
+        if (window.tutorialBtnX !== undefined) {
+            if (mouseX > window.tutorialBtnX && mouseX < window.tutorialBtnX + window.tutorialBtnW &&
+                mouseY > window.tutorialBtnY && mouseY < window.tutorialBtnY + window.tutorialBtnH) {
+                console.log("Tutorial Dismissed!");
+                showTutorialOverlay = false;
+                gameStartTime = millis();
+                timeElapsed = 0;
+                return false;
+            }
+        }
+        return;
+    }
+
+    // 2. Existing Game Logic
     if (currentDifficultyLevel !== 'test' || gameState !== PLAYING) return;
 
     // Try to find an obstacle to drag
@@ -856,6 +875,7 @@ function mousePressed() {
 }
 
 function mouseDragged() {
+    if (showTutorialOverlay) return; // Prevent dragging during tutorial
     if (draggedObstacle) {
         draggedObstacle.position.set(mouseX, mouseY);
     }
