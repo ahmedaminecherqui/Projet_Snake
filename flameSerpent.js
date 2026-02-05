@@ -528,6 +528,7 @@ class FlameSerpent {
                         particles.burst(segment.position.x, segment.position.y, this.colorMain, 40);
                         particles.burst(segment.position.x, segment.position.y, this.colorAccent, 25);
                     }
+                    if (typeof explodeSound !== 'undefined') explodeSound.play();
                     if (typeof screenShake !== 'undefined') screenShake = 5;
                 }
 
@@ -660,6 +661,7 @@ class FlameSerpent {
         let bigFB = new Fireball(head.position.x, head.position.y, angle, 9);
         bigFB.size = 80; // Massive!
         this.fireballs.push(bigFB);
+        if (typeof fireShotSound !== 'undefined') fireShotSound.play();
     }
 
     releaseThorns() {
@@ -683,6 +685,7 @@ class FlameSerpent {
             let angle = baseAngle + map(i, 0, count - 1, -spread / 2, spread / 2);
             this.fireballs.push(new Fireball(head.position.x, head.position.y, angle));
         }
+        if (typeof fireShotSound !== 'undefined') fireShotSound.play();
     }
 
     display() {

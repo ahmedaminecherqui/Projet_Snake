@@ -19,6 +19,14 @@ let mascotImg;
 let backgroundImg;
 let foodIconsImg;
 
+// Sound Assets
+let bossMusic;
+let bossHitSound;
+let explodeSound;
+let fireShotSound;
+let hurtSound;
+let dieSound;
+
 // Game States
 const START = 'START';
 const PLAYING = 'PLAYING';
@@ -131,9 +139,17 @@ let timeElapsed = 0;
 let levelTimeLimit = 0; // seconds allowed to complete current level
 
 function preload() {
-    mascotImg = loadImage('assets/mascot.png', () => console.log("Mascot loaded"), () => console.warn("Mascot load failed"));
-    backgroundImg = loadImage('assets/background.png', () => console.log("Background loaded"), () => console.warn("Background load failed"));
-    foodIconsImg = loadImage('assets/food.png', () => console.log("Food loaded"), () => console.warn("Food load failed"));
+    mascotImg = loadImage('assets/mascot.png');
+    backgroundImg = loadImage('assets/background.png');
+    foodIconsImg = loadImage('assets/food.png');
+
+    // Load Sounds
+    bossMusic = loadSound('assets/86. Boss.mp3');
+    bossHitSound = loadSound('assets/07. Bosshit.mp3');
+    explodeSound = loadSound('assets/25. Explode.mp3');
+    fireShotSound = loadSound('assets/32. Fireshot.mp3');
+    hurtSound = loadSound('assets/38. Hurt.mp3');
+    dieSound = loadSound('assets/91. Die.mp3');
 }
 
 function setup() {
@@ -264,6 +280,7 @@ function resetGame() {
     timeElapsed = 0;
     gameStartTime = null; // will be set when tutorial closes or immediately for non-tutorial
     formationTargets = []; // Clear formation targets for completion animation
+    if (bossMusic) bossMusic.stop();
 
     const gameOverModal = document.getElementById('game-over-modal');
     if (gameOverModal) gameOverModal.classList.add('hidden');
@@ -815,6 +832,7 @@ function updateGame() {
             if (snake.checkHeadbuttDamage(bossEntity)) {
                 bossEntity.health -= 1;
                 console.log(`Boss headbutted! Damage: 1, Health: ${bossEntity.health}/${bossEntity.maxHealth}`);
+                if (typeof bossHitSound !== 'undefined') bossHitSound.play();
 
                 // Visual feedback
                 particles.burst(bossEntity.segments[0].position.x, bossEntity.segments[0].position.y, color(251, 191, 36), 30);
@@ -823,6 +841,7 @@ function updateGame() {
 
                 if (bossEntity.health <= 0) {
                     bossEntity.setState(BossState.DYING);
+                    if (bossMusic) bossMusic.stop();
                 }
             }
 
@@ -907,6 +926,11 @@ function updateBossIntro() {
         gameState = PLAYING;
         gameStartTime = millis();
         screenShake = 0;
+
+        // Start Boss Music Loop
+        if (bossMusic && !bossMusic.isPlaying()) {
+            bossMusic.loop();
+        }
     }
 
     // Always display
@@ -1092,7 +1116,11 @@ function takeDamage(hitPoint = null) {
     }
 
     if (lives <= 0) {
+        if (dieSound) dieSound.play();
+        if (bossMusic) bossMusic.stop();
         triggerGameOver();
+    } else {
+        if (hurtSound) hurtSound.play();
     }
 }
 
@@ -1339,6 +1367,7 @@ function keyPressed() {
 let draggedObstacle = null;
 
 function mousePressed() {
+    userStartAudio(); // Resume audio context on first click
     // 1. Handle Tutorial Dismissal
     if (showTutorialOverlay) {
         console.log("Mouse Clicked at:", mouseX, mouseY);
