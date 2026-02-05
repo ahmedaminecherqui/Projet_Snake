@@ -25,7 +25,11 @@ const PLAYING = 'PLAYING';
 const PAUSED = 'PAUSED';
 const GAMEOVER = 'GAMEOVER';
 const COMPLETING = 'COMPLETING';
+const BOSS_INTRO = 'BOSS_INTRO'; // Cinematic state
 let gameState = START;
+
+let cinematicTimer = 0;
+let screenShake = 0; // Current intensity
 
 let completionStartTime = 0;
 let showCompleteMenuTime = 1000; // 1 second delay
@@ -253,13 +257,18 @@ function resetGame() {
     const gameOverModal = document.getElementById('game-over-modal');
     if (gameOverModal) gameOverModal.classList.add('hidden');
 
-    snake = new Snake(width / 2, height / 2);
     lives = 3;
     invulnerableTimer = 0;
     updateHealthUI();
     initFoods();
     initObstacles();
     initToxicSnakes();
+
+    // Default HUD visibility
+    document.querySelector('.score-container')?.classList.remove('hidden');
+    document.querySelector('.top-score-container')?.classList.remove('hidden');
+    document.querySelector('.timer-container')?.classList.remove('hidden');
+    document.getElementById('health-container')?.classList.add('hidden');
 
     const levelData = getCurrentLevelData();
     showTutorialOverlay = levelData.isTutorial;
@@ -268,15 +277,24 @@ function resetGame() {
     // Initialize Boss Renderer if active
     if (currentBoss) {
         bossRenderer.init(currentBoss);
-        // Correct check — currentBoss is the bossId string
-        if (currentBoss === 'flame-serpent') {
-            bossEntity = new FlameSerpent(width * 0.8, height / 2);
-            // Force an immediate bat pulse for atmosphere
+        // Correct check — currentBoss is a level object or string ID
+        const bossId = typeof currentBoss === 'string' ? currentBoss : currentBoss.bossId;
+
+        if (bossId === 'flame-serpent') {
+            // Position boss off-screen top (descent)
+            bossEntity = new FlameSerpent(width * 0.8, -500);
             if (batFlock) batFlock.triggerPulse();
         }
+
+        // Position player snake off-screen left (entry)
+        snake = new Snake(-200, height / 2);
+        gameState = BOSS_INTRO;
+        cinematicTimer = 0;
     } else {
         bossRenderer.stop();
         bossEntity = null;
+        snake = new Snake(width / 2, height / 2);
+        gameState = PLAYING;
     }
 
     // In test mode, player snake is autonomous
@@ -285,12 +303,11 @@ function resetGame() {
     }
 
     // start timer only if not a tutorial; tutorial will start timer when closed
-    if (!showTutorialOverlay) {
+    if (!showTutorialOverlay && gameState === PLAYING) {
         gameStartTime = millis();
     }
     console.log('Level:', currentLevel, 'Difficulty:', currentDifficultyLevel, 'Tutorial:', showTutorialOverlay);
 
-    gameState = PLAYING;
     loop();
 }
 
@@ -352,8 +369,16 @@ function initObstacles() {
 }
 
 function draw() {
+    push();
+    // 0. GLOBAL SCREEN SHAKE (Applies during boss intro or heavy impacts)
+    if (screenShake > 0) {
+        translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+        screenShake *= 0.9; // Decay
+        if (screenShake < 0.1) screenShake = 0;
+    }
+
     // 1. LAYER: BACKGROUND
-    if (currentBoss && (gameState === PLAYING || gameState === PAUSED)) {
+    if (currentBoss && (gameState === PLAYING || gameState === PAUSED || gameState === BOSS_INTRO)) {
         bossRenderer.drawBackground();
     } else {
         background(15, 23, 42);
@@ -368,12 +393,15 @@ function draw() {
     // 2. LAYER: GAME ENTITIES & LOGIC
     if (gameState === PLAYING && snake) {
         updateGame();
+    } else if (gameState === BOSS_INTRO) {
+        updateBossIntro();
     } else if (gameState === PAUSED && snake) {
         // Render static game state when paused
         for (let f of foods) f.display(foodIconsImg);
         for (let o of obstacles) o.display();
         for (let ts of toxicSnakes) ts.display();
         if (snake) snake.display(mascotImg);
+        if (bossEntity) bossEntity.display();
     } else if (gameState === COMPLETING) {
         updateCompleting();
     } else if (gameState === GAMEOVER) {
@@ -385,7 +413,7 @@ function draw() {
     }
 
     // 3. LAYER: FOREGROUND (Boss Arena Rocks)
-    if (currentBoss && (gameState === PLAYING || gameState === PAUSED)) {
+    if (currentBoss && (gameState === PLAYING || gameState === PAUSED || gameState === BOSS_INTRO)) {
         bossRenderer.drawForeground();
     }
 
@@ -403,6 +431,12 @@ function draw() {
         batFlock.update();
         batFlock.display();
     }
+
+    // Boss Health Bar (Skulls)
+    if (currentBoss && bossEntity && (gameState === PLAYING || gameState === BOSS_INTRO)) {
+        drawBossHealthBar();
+    }
+    pop();
 }
 
 let formationTargets = [];
@@ -739,6 +773,142 @@ function updateGame() {
         particles.update();
     }
 }
+
+function hideHUD() {
+    document.querySelector('.score-container')?.classList.add('hidden');
+    document.querySelector('.top-score-container')?.classList.add('hidden');
+    document.querySelector('.timer-container')?.classList.add('hidden');
+    document.getElementById('health-container')?.classList.remove('hidden');
+}
+
+function showHUD() {
+    document.querySelector('.score-container')?.classList.remove('hidden');
+    document.querySelector('.top-score-container')?.classList.remove('hidden');
+    document.querySelector('.timer-container')?.classList.remove('hidden');
+    document.getElementById('health-container')?.classList.add('hidden');
+}
+
+function updateBossIntro() {
+    cinematicTimer++;
+
+    // 1. PLAYER ENTRY (0-100)
+    if (cinematicTimer < 100) {
+        let entryTarget = createVector(width / 4, height / 2);
+        snake.update(entryTarget, [], [], []);
+        hideHUD();
+    }
+    // 2. BOSS DESCENT (100-240)
+    else if (cinematicTimer < 240) {
+        hideHUD();
+        snake.update(snake.segments[0].position.copy(), [], [], []);
+        screenShake = map(cinematicTimer, 100, 240, 0, 10);
+
+        if (bossEntity) {
+            let bossTarget = createVector(width * 0.7, height / 2);
+            let steer = bossEntity.segments[0].seek(bossTarget);
+            bossEntity.segments[0].applyForce(steer);
+            bossEntity.update([], true); // Natural physics, NO wander
+        }
+    }
+    // 3. TRACKING (240-400)
+    // No coiling, just head-lock tracking. Body is stretched.
+    else if (cinematicTimer < 400) {
+        hideHUD();
+        screenShake = 2;
+        if (bossEntity) {
+            let head = bossEntity.segments[0];
+            let targetPos = snake.segments[0].position;
+            let dx = targetPos.x - head.position.x;
+            let dy = targetPos.y - head.position.y;
+            let angleToPlayer = atan2(dy, dx);
+
+            bossEntity.headRotationOverride = angleToPlayer;
+            bossEntity.update([], true); // Body follows, NO wander
+        }
+        snake.update(snake.segments[0].position.copy(), [], [], []);
+    }
+    // START FIGHT
+    else {
+        if (bossEntity) bossEntity.headRotationOverride = null;
+        gameState = PLAYING;
+        gameStartTime = millis();
+        screenShake = 0;
+    }
+
+    // Display
+    if (snake) snake.display(mascotImg);
+    if (bossEntity) bossEntity.display();
+}
+
+function drawBossHealthBar() {
+    if (!bossEntity) return;
+
+    let skullSize = 40;
+    let barWidth = 340;
+    let xBase = width - barWidth - 30; // 30px padding from right
+    let y = 60;
+
+    // Background Bar (Top Right)
+    fill(0, 150);
+    noStroke();
+    rectMode(CORNER);
+    rect(xBase - 10, y - 35, barWidth, 70, 15);
+
+    // Draw 6 Skulls
+    for (let i = 0; i < bossEntity.maxHealth; i++) {
+        let isDead = i >= bossEntity.health;
+        let skullX = xBase + 25 + i * 50;
+        drawSkull(skullX, y, skullSize, isDead);
+    }
+
+    // Boss Name
+    fill(255);
+    textAlign(RIGHT, CENTER);
+    textSize(18);
+    textStyle(BOLD);
+    text("FLAME SERPENT", xBase + barWidth - 25, y - 45);
+}
+
+function drawSkull(x, y, size, isDead) {
+    push();
+    translate(x, y);
+    noStroke();
+
+    // Skull Color
+    if (isDead) {
+        fill(60, 60, 60, 180); // Empty
+    } else {
+        fill(245, 235, 220); // Bone White
+        let pulse = sin(frameCount * 0.15 + x) * 2;
+        size += pulse;
+    }
+
+    // Top Dome
+    ellipse(0, -size * 0.1, size * 0.8, size * 0.75);
+    // Cheekbones
+    ellipse(-size * 0.2, size * 0.1, size * 0.4, size * 0.3);
+    ellipse(size * 0.2, size * 0.1, size * 0.4, size * 0.3);
+    // Jaw/Teeth area
+    rectMode(CENTER);
+    rect(0, size * 0.25, size * 0.45, size * 0.35, 4);
+
+    // Eye Sockets
+    fill(isDead ? 30 : 10);
+    ellipse(-size * 0.18, 0, size * 0.22, size * 0.25);
+    ellipse(size * 0.18, 0, size * 0.22, size * 0.25);
+
+    // Nose hole (upside down heart)
+    ellipse(0, size * 0.1, size * 0.1, size * 0.08);
+
+    // Teeth lines
+    stroke(isDead ? 50 : 120);
+    strokeWeight(1.5);
+    for (let i = -1; i <= 1; i++) {
+        line(i * size * 0.1, size * 0.15, i * size * 0.1, size * 0.35);
+    }
+    pop();
+}
+
 
 function triggerGameOver() {
     const levelData = getCurrentLevelData();

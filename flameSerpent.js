@@ -18,18 +18,58 @@ class FlameSerpent extends Vehicle {
         this.colorMain = color(220, 38, 38); // Red
         this.colorAccent = color(251, 191, 36); // Gold/Fire
         this.colorDark = color(69, 10, 10); // Dark Blood Red
+
+        // Health
+        this.maxHealth = 6;
+        this.health = 6;
+
+        // Cinematic Overrides
+        this.headRotationOverride = null;
     }
 
-    update(obstacles = []) {
+    /**
+     * Spiritually coils the boss into a tight spiral for the intro.
+     * @param {number} centerX
+     * @param {number} centerY
+     * @param {boolean} instant If true, snaps instead of lerping
+     */
+    setCoiledLayout(centerX, centerY, instant = false) {
+        for (let i = 0; i < this.segments.length; i++) {
+            let seg = this.segments[i];
+
+            // TIGHT SPIRAL: Spacing based on segment size
+            // i=0 is head (center), i=N is tail (outer)
+            let angle = i * 0.35;
+            let radius = i * (this.segmentSize * 0.08); // Ultra-tight spacing (0.08)
+
+            let targetX = centerX + cos(angle) * radius;
+            let targetY = centerY + sin(angle) * radius;
+
+            if (instant) {
+                seg.position.x = targetX;
+                seg.position.y = targetY;
+            } else {
+                seg.position.x = lerp(seg.position.x, targetX, 0.15);
+                seg.position.y = lerp(seg.position.y, targetY, 0.15);
+            }
+
+            // Set velocity/heading to match the spiral curve
+            let nextAngle = (i + 1) * 0.35;
+            let dir = createVector(cos(nextAngle) - cos(angle), sin(nextAngle) - sin(angle));
+            seg.velocity = dir;
+        }
+    }
+
+    update(obstacles = [], skipWander = false) {
         let head = this.segments[0];
 
-        // 1. Autonomous Wandering
-        let wanderForce = head.wander();
-        let avoidForce = head.avoid(obstacles);
-        let boundsForce = head.boundaries(100); // Keep away from edges
-
-        head.applyForce(wanderForce);
-        head.applyForce(avoidForce.mult(2.0));
+        if (!skipWander) {
+            // 1. Autonomous Wandering
+            let wanderForce = head.wander();
+            let avoidForce = head.avoid(obstacles);
+            head.applyForce(wanderForce);
+            head.applyForce(avoidForce.mult(2.0));
+        }
 
         head.update();
 
@@ -63,7 +103,10 @@ class FlameSerpent extends Vehicle {
         for (let i = this.segments.length - 1; i >= 0; i--) {
             let seg = this.segments[i];
             let pos = seg.position;
-            let angle = seg.velocity.heading();
+            let angle = (i === 0 && this.headRotationOverride !== null) ?
+                this.headRotationOverride :
+                seg.velocity.heading();
+
             let isHead = (i === 0);
             let isTailTip = (i === this.segments.length - 1);
 
