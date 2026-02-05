@@ -10,6 +10,10 @@ class ToxicSnake {
         head.maxForce = this.baseMaxForce;
         this.segments.push(head);
 
+        // Tongue animation state
+        this.tongueActive = false;
+        this.tongueTimer = 0;
+
         for (let i = 0; i < 10; i++) {
             this.addSegment();
         }
@@ -40,6 +44,17 @@ class ToxicSnake {
         // IMPORTANT: Calculate boundary steering force BEFORE update
         head.boundaries(40);
         head.update();
+
+        // Update tongue timer
+        if (gameState === PLAYING) {
+            if (this.tongueActive) {
+                this.tongueTimer--;
+                if (this.tongueTimer <= 0) this.tongueActive = false;
+            } else if (random(1) < 0.03) { // Increased frequency for enemies
+                this.tongueActive = true;
+                this.tongueTimer = 25 + random(25); // Increased duration
+            }
+        }
 
         for (let i = 1; i < this.segments.length; i++) {
             let segment = this.segments[i];
@@ -90,6 +105,28 @@ class ToxicSnake {
                 fill(255);
                 ellipse(-5, -5, 5, 5);
                 ellipse(5, -5, 5, 5);
+                // --- HUMONGOUS PURPLE TONGUE (FORKED LINE + V) ---
+                if (this.tongueActive && gameState !== COMPLETING) {
+                    let flicker = map(sin(frameCount * 1.5), -1, 1, 0.7, 1.3);
+                    let baseLen = 25; // Humongous
+                    let len = baseLen * flicker;
+
+                    push();
+                    drawingContext.shadowBlur = 30;
+                    drawingContext.shadowColor = color(168, 85, 247);
+                    stroke(168, 85, 247); // Extreme Purple
+                    strokeWeight(5); // Ultra Thicker
+                    strokeCap(ROUND);
+                    noFill();
+
+                    translate(0, -25); // Tip of sharp head
+                    line(0, 0, 0, -len); // Central line
+                    // Huge Forked tips (V)
+                    line(0, -len, -10, -len - 10);
+                    line(0, -len, 10, -len - 10);
+                    pop();
+                }
+
                 pop();
             } else {
                 // Overlapping body circles

@@ -11,6 +11,10 @@ class Snake extends Vehicle {
         this.isAutonomous = false;
 
         for (let i = 0; i < 3; i++) { this.addSegment(); } // Reduced starting length
+
+        // Tongue animation state
+        this.tongueActive = false;
+        this.tongueTimer = 0;
     }
 
     addSegment() {
@@ -69,6 +73,17 @@ class Snake extends Vehicle {
         head.boundaries(40);
         head.update();
 
+        // Update tongue timer
+        if (gameState === PLAYING) {
+            if (this.tongueActive) {
+                this.tongueTimer--;
+                if (this.tongueTimer <= 0) this.tongueActive = false;
+            } else if (random(1) < 0.05) { // MUCH more frequent (5% chance per frame)
+                this.tongueActive = true;
+                this.tongueTimer = 40 + random(20); // Stays out longer
+            }
+        }
+
         for (let i = 1; i < this.segments.length; i++) {
             let segment = this.segments[i];
             let prev = this.segments[i - 1];
@@ -110,12 +125,30 @@ class Snake extends Vehicle {
                 rotate(angle);
                 imageMode(CENTER);
 
-                // Draw a simple aura/glow behind the mascot
-                drawingContext.shadowBlur = 15;
-                drawingContext.shadowColor = color(74, 222, 128);
-
                 // Offset image so its "neck" is at the pivot (0,0)
                 image(mascotImg, 0, -20, 60, 60);
+
+                // --- HUMONGOUS TONGUE (FORKED LINE + V) ---
+                if (this.tongueActive && gameState !== COMPLETING) {
+                    let flicker = map(sin(frameCount * 1.5), -1, 1, 0.7, 1.3);
+                    let baseLen = 30; // Humongous
+                    let len = baseLen * flicker;
+
+                    push();
+                    drawingContext.shadowBlur = 30;
+                    drawingContext.shadowColor = color(255, 0, 0);
+                    stroke(255, 0, 0); // Extreme Red
+                    strokeWeight(5); // Ultra Thicker
+                    strokeCap(ROUND);
+                    noFill();
+
+                    translate(0, -45);
+                    line(0, 0, 0, -len); // Central line
+                    // Huge Forked tips (V)
+                    line(0, -len, -10, -len - 10);
+                    line(0, -len, 10, -len - 10);
+                    pop();
+                }
                 pop();
             } else {
                 // Body segments
