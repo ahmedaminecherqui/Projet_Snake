@@ -9,6 +9,9 @@ let topScore = 0;
 let gameOver = false;
 let currentBoss = null; // Track active boss for exclusive mechanics
 let bossRenderer; // Handles boss environment visuals
+let bossEntity = null; // The actual boss character
+let lives = 3;
+let invulnerableTimer = 0;
 
 // Assets
 let mascotImg;
@@ -248,6 +251,9 @@ function resetGame() {
     if (gameOverModal) gameOverModal.classList.add('hidden');
 
     snake = new Snake(width / 2, height / 2);
+    lives = 3;
+    invulnerableTimer = 0;
+    updateHealthUI();
     initFoods();
     initObstacles();
     initToxicSnakes();
@@ -259,8 +265,12 @@ function resetGame() {
     // Initialize Boss Renderer if active
     if (currentBoss) {
         bossRenderer.init(currentBoss);
+        if (currentBoss.bossId === 'flame-serpent') {
+            bossEntity = new FlameSerpent(width * 0.8, height / 2);
+        }
     } else {
         bossRenderer.stop();
+        bossEntity = null;
     }
 
     // In test mode, player snake is autonomous
@@ -292,6 +302,8 @@ function resumeGame() {
 
 function initFoods() {
     foods = [];
+    if (currentBoss) return; // NO FOOD IN BOSS BATTLES
+
     const settings = difficultySettings[currentDifficultyLevel];
     const foodCount = settings ? settings.food : 5;
     for (let i = 0; i < foodCount; i++) {
@@ -336,6 +348,9 @@ function draw() {
         bossRenderer.drawBackground();
     } else {
         background(15, 23, 42);
+        if (currentBoss) {
+            bossRenderer.drawBackground();
+        }
         if (backgroundImg && backgroundImg.width > 0) {
             image(backgroundImg, 0, 0, width, height);
         }
@@ -594,6 +609,10 @@ function updateGame() {
         ts.display();
     }
 
+    if (bossEntity) {
+        bossEntity.display();
+    }
+
     // Display particles as they currently are, but don't advance their state while paused.
     if (particles) {
         particles.display();
@@ -646,13 +665,22 @@ function updateGame() {
             // In boss mode, disable self-collision to allow more freedom of movement
             let selfCollision = currentBoss ? false : snake.checkSelfCollision();
 
+            let collisionPoint = (bossEntity && bossEntity.checkCollision(snake));
             if (selfCollision ||
                 snake.checkObstacleCollision(obstacles) ||
-                snake.checkEnemyCollision(toxicSnakes)) {
-                triggerGameOver();
-                return; // Stop processing frame immediately
+                snake.checkEnemyCollision(toxicSnakes) ||
+                collisionPoint) {
+
+                if (currentBoss) {
+                    takeDamage(collisionPoint);
+                } else {
+                    triggerGameOver();
+                    return; // Stop processing frame immediately
+                }
             }
         }
+
+        if (invulnerableTimer > 0) invulnerableTimer--;
 
         // Time limit enforcement
         if (levelTimeLimit > 0 && gameStartTime && timeElapsed >= levelTimeLimit) {
@@ -678,6 +706,10 @@ function updateGame() {
         }
 
         snake.update(target, obstacles, toxicSnakes, foods);
+
+        if (bossEntity) {
+            bossEntity.update(obstacles);
+        }
     }
 
     // Now safely update particle simulation
@@ -749,6 +781,51 @@ function updateUI() {
     document.getElementById('current-score').innerText = score;
     document.getElementById('top-score-game').innerText = topScore;
     document.getElementById('top-score-menu').innerText = topScore;
+    updateHealthUI();
+}
+
+function updateHealthUI() {
+    const healthContainer = document.getElementById('health-container');
+    if (!currentBoss) {
+        healthContainer.classList.add('hidden');
+        return;
+    }
+
+    healthContainer.classList.remove('hidden');
+    for (let i = 1; i <= 3; i++) {
+        const heart = document.getElementById(`heart-${i}`);
+        if (i > lives) {
+            if (!heart.classList.contains('lost')) {
+                heart.classList.add('lost', 'shake');
+            }
+        } else {
+            heart.classList.remove('lost', 'shake');
+        }
+    }
+}
+
+function takeDamage(hitPoint = null) {
+    if (invulnerableTimer > 0) return;
+
+    lives--;
+    invulnerableTimer = 90; // ~1.5 seconds of invincibility
+    updateHealthUI();
+
+    if (snake) {
+        snake.damageTimer = 90; // Trigger red flash and stun in snake.js
+
+        // PUSHBACK/KNOCKBACK LOGIC
+        if (hitPoint) {
+            let pushDir = p5.Vector.sub(snake.segments[0].position, hitPoint);
+            pushDir.setMag(15); // Powerful impulse
+            snake.segments[0].velocity.add(pushDir);
+            snake.segments[0].position.add(pushDir); // Instant shift
+        }
+    }
+
+    if (lives <= 0) {
+        triggerGameOver();
+    }
 }
 
 function updateTimerUI() {
@@ -923,12 +1000,13 @@ function setupLevelSelection() {
                 btn.disabled = false;
             }
 
-            // Ensure boss mode is reset when clicking normal levels
+            // Ensure boss mode is set correctly when clicking levels
             btn.onclick = () => {
                 if (!btn.classList.contains('locked')) {
                     currentDifficultyLevel = difficulty;
                     currentLevel = level.level;
-                    currentBoss = null; // Clear boss state
+                    // If level has a bossId, it is a boss level
+                    currentBoss = level.bossId ? level : null;
                     startGame();
                 }
             };
@@ -956,6 +1034,23 @@ function setupLevelSelection() {
             startGame();
         };
     }
+
+    // Handle Expert Boss Cards (Hardcoded in HTML)
+    document.querySelectorAll('.boss-card').forEach(card => {
+        card.onclick = () => {
+            const bossId = card.getAttribute('data-boss');
+            currentDifficultyLevel = 'expert';
+            // Find level index based on bossId
+            const levelIdx = levelProgression.expert.findIndex(l => l.bossId === bossId);
+            if (levelIdx !== -1) {
+                currentLevel = levelIdx + 1;
+                currentBoss = levelProgression.expert[levelIdx];
+                document.getElementById('main-menu').classList.add('hidden');
+                document.getElementById('game-ui').classList.remove('hidden');
+                startGame();
+            }
+        };
+    });
 }
 
 function keyPressed() {

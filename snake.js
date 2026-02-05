@@ -21,6 +21,7 @@ class Snake extends Vehicle {
         this.dashTimer = 0;
         this.dashCooldown = 0;
         this.ghostHistory = []; // Stores full body snapshots for the trail
+        this.damageTimer = 0; // For flashing red on hit
     }
 
     addSegment() {
@@ -32,6 +33,13 @@ class Snake extends Vehicle {
     }
 
     update(target, obstacles, toxicSnakes = [], foods = []) {
+        if (this.damageTimer > 0) this.damageTimer--;
+
+        // STUN LOGIC: If recently damaged (first 0.5s of 1.5s timer), lose control
+        if (this.damageTimer > 60) {
+            target = this.segments[0].position.copy(); // Stay put/drift
+        }
+
         let head = this.segments[0];
 
         if (this.isAutonomous) {
@@ -166,6 +174,15 @@ class Snake extends Vehicle {
             let inter = map(i, 0, this.segments.length, 0, 1);
             let c = lerpColor(color(74, 222, 128), color(22, 101, 52), inter);
 
+            // DAMAGE FLASH: If damaged, flicker between actual color and bright red
+            let isFlashFrame = false;
+            if (this.damageTimer > 0) {
+                if (floor(frameCount / 4) % 2 === 0) {
+                    c = color(239, 68, 68); // Bright Red
+                    isFlashFrame = true;
+                }
+            }
+
             // Normalize size if forming word, otherwise use tapering
             let size = (gameState === COMPLETING) ? 1.0 : map(i, 0, this.segments.length, 1.4, 0.6);
 
@@ -191,7 +208,13 @@ class Snake extends Vehicle {
                 imageMode(CENTER);
 
                 // Offset image so its "neck" is at the pivot (0,0)
+                if (isFlashFrame) {
+                    tint(255, 0, 0); // Flash Red Head
+                } else {
+                    noTint();
+                }
                 image(mascotImg, 0, -20, 60, 60);
+                noTint();
 
                 // --- HUMONGOUS TONGUE (FORKED LINE + V) ---
                 if (this.tongueActive && gameState !== COMPLETING) {

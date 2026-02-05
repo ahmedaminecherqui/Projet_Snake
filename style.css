@@ -648,3 +648,60 @@ canvas {
         opacity: 1;
     }
 }
+
+/* --- BOSS HEALTH UI --- */
+.health-container {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.heart {
+    font-size: 1.5rem;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.5));
+}
+
+.heart.lost {
+    opacity: 0.3;
+    filter: grayscale(1) blur(1px);
+    transform: scale(0.8);
+}
+
+.heart.shake {
+    animation: heartShake 0.4s ease-in-out;
+}
+
+@keyframes heartShake {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    25% {
+        transform: scale(1.3) rotate(15deg);
+    }
+
+    50% {
+        transform: scale(1.3) rotate(-15deg);
+    }
+
+    75% {
+        transform: scale(1.3) rotate(15deg);
+    }
+}
+
+#health-container.hidden {
+    display: none;
+}
+
+/* --- SNAKE DAMAGE FLASH --- */
+.flash-red {
+    background: rgba(239, 68, 68, 0.4) !important;
+}
