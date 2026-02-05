@@ -67,14 +67,46 @@ class Fireball {
     }
 }
 
+class Thorn {
+    constructor(x, y, angle) {
+        this.pos = createVector(x, y);
+        this.vel = p5.Vector.fromAngle(angle).mult(14); // Faster thorns
+        this.size = 25; // Larger thorns
+        this.alive = true;
+        this.life = 120;
+    }
+
+    update() {
+        this.pos.add(this.vel);
+        this.life--;
+        if (this.life <= 0) this.alive = false;
+    }
+
+    display() {
+        push();
+        translate(this.pos.x, this.pos.y);
+        rotate(this.vel.heading());
+        fill(255, 68, 68); // Brighter red
+        stroke(255, 200, 0); // Gold stroke
+        strokeWeight(2);
+        beginShape();
+        vertex(this.size, 0);
+        vertex(-this.size * 0.5, -this.size * 0.4);
+        vertex(-this.size * 0.2, 0);
+        vertex(-this.size * 0.5, this.size * 0.4);
+        endShape(CLOSE);
+        pop();
+    }
+}
+
 class FlameSerpent {
     constructor(x, y, segments = 75) {
         this.segments = [];
         this.segmentSize = 95; // Boss is gargantuan!
 
         // Stats for the "head" part
-        this.maxSpeed = 3;
-        this.maxForce = 0.15;
+        this.maxSpeed = 4; // Slightly faster default
+        this.maxForce = 0.2;
 
         // Initialize segments as Vehicles
         for (let i = 0; i < segments; i++) {
@@ -92,12 +124,17 @@ class FlameSerpent {
 
         // Moveset & State
         this.headRotationOverride = null;
-        this.currentState = BossState.WANDERING;
+        this.currentState = BossState.TRACKING; // Start by tracking the player
         this.stateTimer = 0;
 
         // Effect Particles
         this.inhaleParticles = [];
         this.fireballs = [];
+        this.thorns = [];
+
+        // Cycle Logic
+        this.comboCount = 0;
+        this.maxCombos = floor(random(1, 5));
     }
 
     setState(newState) {
@@ -142,12 +179,40 @@ class FlameSerpent {
 
         switch (this.currentState) {
             case BossState.WANDERING:
-                // Normal autonomous movement
-                let wanderForce = head.wander();
-                let avoidForceW = head.avoid(obstacles);
-                head.applyForce(wanderForce);
-                head.applyForce(avoidForceW.mult(2.0));
-                head.update();
+                // Normal autonomous movement but can follow player sometimes
+                let targetPos = target ? (random() < 0.3 ? target : null) : null;
+                let steerForce;
+                if (targetPos) {
+                    steerForce = head.seek(targetPos);
+                    head.maxSpeed = 5; // Faster homing
+                } else {
+                    steerForce = head.wander();
+                    head.maxSpeed = 6; // Fast wandering
+                }
+                head.applyForce(steerForce);
+
+                // Manual update to bypass boundary constraints in Vehicle class
+                head.velocity.add(head.acceleration);
+                head.velocity.limit(head.maxSpeed);
+                head.position.add(head.velocity);
+                head.acceleration.mult(0);
+
+                // Random Attacks while wandering - Increased frequency
+                if (this.stateTimer > 40 && frameCount % 60 === 0) {
+                    let r = random();
+                    if (r < 0.2) { // 20% chance for Big Fireball
+                        this.shootBigFireball();
+                    } else if (r < 0.45) { // 25% chance for Thorn Burst
+                        this.releaseThorns();
+                    }
+                }
+
+                // Cycle back to tracking after wandering for a while
+                if (this.stateTimer > 400) {
+                    this.comboCount = 0;
+                    this.maxCombos = floor(random(1, 5));
+                    this.setState(BossState.TRACKING);
+                }
                 break;
 
             case BossState.SEEKING:
@@ -167,6 +232,10 @@ class FlameSerpent {
                     let dx = target.x - head.position.x;
                     let dy = target.y - head.position.y;
                     this.headRotationOverride = atan2(dy, dx);
+                }
+                // Prepare for inhale
+                if (this.stateTimer > 60) {
+                    this.setState(BossState.INHALING);
                 }
                 break;
 
@@ -202,9 +271,14 @@ class FlameSerpent {
                 break;
 
             case BossState.EXHALING:
-                // Stay focused while shooting
+                // Cooldown after shooting
                 if (this.stateTimer > 60) {
-                    this.setState(BossState.TRACKING);
+                    this.comboCount++;
+                    if (this.comboCount >= this.maxCombos) {
+                        this.setState(BossState.WANDERING);
+                    } else {
+                        this.setState(BossState.TRACKING);
+                    }
                 }
                 break;
         }
@@ -256,6 +330,32 @@ class FlameSerpent {
             if (!this.fireballs[i].alive) {
                 this.fireballs.splice(i, 1);
             }
+        }
+
+        // Update Thorns
+        for (let i = this.thorns.length - 1; i >= 0; i--) {
+            this.thorns[i].update();
+            if (!this.thorns[i].alive) {
+                this.thorns.splice(i, 1);
+            }
+        }
+    }
+
+    shootBigFireball() {
+        let head = this.segments[0];
+        let angle = head.velocity.heading();
+        let bigFB = new Fireball(head.position.x, head.position.y, angle, 9);
+        bigFB.size = 80; // Massive!
+        this.fireballs.push(bigFB);
+    }
+
+    releaseThorns() {
+        // Release thorns from random body segments
+        for (let i = 5; i < this.segments.length; i += 10) {
+            let seg = this.segments[i];
+            let angle = seg.velocity.heading() + PI / 2; // Perpendicular to segment
+            this.thorns.push(new Thorn(seg.position.x, seg.position.y, angle));
+            this.thorns.push(new Thorn(seg.position.x, seg.position.y, angle + PI));
         }
     }
 
@@ -312,6 +412,11 @@ class FlameSerpent {
         // Draw Fireballs
         for (let fb of this.fireballs) {
             fb.display();
+        }
+
+        // Draw Thorns
+        for (let th of this.thorns) {
+            th.display();
         }
     }
 
@@ -425,6 +530,7 @@ class FlameSerpent {
         vertex(-size, -size * 0.3);
         vertex(-size * 0.5, 0);
         vertex(-size, size * 0.3);
+        endShape(CLOSE);
     }
 
     checkCollision(playerSnake) {
@@ -448,10 +554,18 @@ class FlameSerpent {
 
         for (let fb of this.fireballs) {
             let d = dist(playerHead.x, playerHead.y, fb.pos.x, fb.pos.y);
-            // Fireball radius (~20) + Snake head radius (~15)
-            if (d < 35) {
-                fb.alive = false; // Destroy fireball on hit
-                return fb.pos.copy(); // Return collision point
+            // Dynamic radius based on fireball size
+            if (d < (fb.size * 0.5 + 15)) {
+                fb.alive = false;
+                return fb.pos.copy();
+            }
+        }
+
+        for (let th of this.thorns) {
+            let d = dist(playerHead.x, playerHead.y, th.pos.x, th.pos.y);
+            if (d < (th.size + 15)) {
+                th.alive = false;
+                return th.pos.copy();
             }
         }
         return null;
