@@ -764,7 +764,7 @@ function updateGame() {
         snake.update(target, obstacles, toxicSnakes, foods);
 
         if (bossEntity) {
-            bossEntity.update(obstacles);
+            bossEntity.update(obstacles, snake.segments[0].position);
         }
     }
 
@@ -798,44 +798,40 @@ function updateBossIntro() {
         hideHUD();
     }
     // 2. BOSS DESCENT (100-240)
+    // Boss comes down naturally. NO COILING.
     else if (cinematicTimer < 240) {
         hideHUD();
         snake.update(snake.segments[0].position.copy(), [], [], []);
         screenShake = map(cinematicTimer, 100, 240, 0, 10);
 
         if (bossEntity) {
-            let bossTarget = createVector(width * 0.7, height / 2);
-            let steer = bossEntity.segments[0].seek(bossTarget);
-            bossEntity.segments[0].applyForce(steer);
-            bossEntity.update([], true); // Natural physics, NO wander
+            let bossTarget = createVector(width * 0.5, height / 2);
+            bossEntity.setState(BossState.SEEKING);
+            bossEntity.update([], bossTarget);
         }
     }
-    // 3. TRACKING (240-400)
-    // No coiling, just head-lock tracking. Body is stretched.
-    else if (cinematicTimer < 400) {
+    // 3. TRACKING (240-420)
+    // Body is static, only head tracks player
+    else if (cinematicTimer < 420) {
         hideHUD();
-        screenShake = 2;
+        screenShake = 1;
         if (bossEntity) {
-            let head = bossEntity.segments[0];
-            let targetPos = snake.segments[0].position;
-            let dx = targetPos.x - head.position.x;
-            let dy = targetPos.y - head.position.y;
-            let angleToPlayer = atan2(dy, dx);
-
-            bossEntity.headRotationOverride = angleToPlayer;
-            bossEntity.update([], true); // Body follows, NO wander
+            bossEntity.setState(BossState.TRACKING);
+            bossEntity.update([], snake.segments[0].position);
         }
         snake.update(snake.segments[0].position.copy(), [], [], []);
     }
     // START FIGHT
     else {
-        if (bossEntity) bossEntity.headRotationOverride = null;
+        // For now, let's keep it in TRACKING for a bit or start WANDERING
+        // User said: "after that the serpent's body still does not moves and his head still just follows in place"
+        // So we stay in TRACKING state initially
         gameState = PLAYING;
         gameStartTime = millis();
         screenShake = 0;
     }
 
-    // Display
+    // Always display
     if (snake) snake.display(mascotImg);
     if (bossEntity) bossEntity.display();
 }
@@ -845,23 +841,24 @@ function drawBossHealthBar() {
 
     let skullSize = 40;
     let barWidth = 340;
-    let xBase = width - barWidth - 30; // 30px padding from right
+    // Fix to Top Right
+    let xBase = width - barWidth - 30;
     let y = 60;
 
-    // Background Bar (Top Right)
+    // Background Bar
     fill(0, 150);
     noStroke();
     rectMode(CORNER);
     rect(xBase - 10, y - 35, barWidth, 70, 15);
 
-    // Draw 6 Skulls
+    // Skulls
     for (let i = 0; i < bossEntity.maxHealth; i++) {
         let isDead = i >= bossEntity.health;
         let skullX = xBase + 25 + i * 50;
         drawSkull(skullX, y, skullSize, isDead);
     }
 
-    // Boss Name
+    // Name
     fill(255);
     textAlign(RIGHT, CENTER);
     textSize(18);

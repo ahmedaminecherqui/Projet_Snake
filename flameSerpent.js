@@ -1,21 +1,29 @@
-class FlameSerpent extends Vehicle {
-    constructor(x, y) {
-        super(x, y);
-        this.segments = [];
-        this.numSegments = 75; // Boss is gargantuan!
-        this.segmentSize = 95; // Boss is wide!
+const BossState = {
+    WANDERING: 'WANDERING',
+    TRACKING: 'TRACKING',
+    SEEKING: 'SEEKING',  // For intentional movement
+    INHALING: 'INHALING',
+    EXHALING: 'EXHALING',
+    DASHING: 'DASHING',
+    DYING: 'DYING'
+};
 
-        // Stats
-        this.maxSpeed = 3; // Slow but majestic
+class FlameSerpent {
+    constructor(x, y, segments = 75) {
+        this.segments = [];
+        this.segmentSize = 95; // Boss is gargantuan!
+
+        // Stats for the "head" part
+        this.maxSpeed = 3;
         this.maxForce = 0.15;
 
-        // Initialize segments
-        for (let i = 0; i < this.numSegments; i++) {
+        // Initialize segments as Vehicles
+        for (let i = 0; i < segments; i++) {
             this.segments.push(new Vehicle(x, y));
         }
 
         // Color Palette
-        this.colorMain = color(220, 38, 38); // Red
+        this.colorMain = color(239, 68, 68); // Bright Fire Red
         this.colorAccent = color(251, 191, 36); // Gold/Fire
         this.colorDark = color(69, 10, 10); // Dark Blood Red
 
@@ -23,24 +31,31 @@ class FlameSerpent extends Vehicle {
         this.maxHealth = 6;
         this.health = 6;
 
-        // Cinematic Overrides
+        // Moveset & State
         this.headRotationOverride = null;
+        this.currentState = BossState.WANDERING;
+        this.stateTimer = 0;
+    }
+
+    setState(newState) {
+        if (this.currentState === newState) return;
+        this.currentState = newState;
+        this.stateTimer = 0;
+
+        // Reset overrides when changing state
+        if (newState === BossState.WANDERING) {
+            this.headRotationOverride = null;
+        }
     }
 
     /**
      * Spiritually coils the boss into a tight spiral for the intro.
-     * @param {number} centerX
-     * @param {number} centerY
-     * @param {boolean} instant If true, snaps instead of lerping
      */
     setCoiledLayout(centerX, centerY, instant = false) {
         for (let i = 0; i < this.segments.length; i++) {
             let seg = this.segments[i];
-
-            // TIGHT SPIRAL: Spacing based on segment size
-            // i=0 is head (center), i=N is tail (outer)
             let angle = i * 0.35;
-            let radius = i * (this.segmentSize * 0.08); // Ultra-tight spacing (0.08)
+            let radius = i * (this.segmentSize * 0.08);
 
             let targetX = centerX + cos(angle) * radius;
             let targetY = centerY + sin(angle) * radius;
@@ -53,53 +68,78 @@ class FlameSerpent extends Vehicle {
                 seg.position.y = lerp(seg.position.y, targetY, 0.15);
             }
 
-            // Set velocity/heading to match the spiral curve
             let nextAngle = (i + 1) * 0.35;
-            let dir = createVector(cos(nextAngle) - cos(angle), sin(nextAngle) - sin(angle));
-            seg.velocity = dir;
+            seg.velocity = createVector(cos(nextAngle) - cos(angle), sin(nextAngle) - sin(angle));
         }
     }
 
-    update(obstacles = [], skipWander = false) {
+    update(obstacles = [], target = null) {
+        this.stateTimer++;
         let head = this.segments[0];
 
-        if (!skipWander) {
-            // 1. Autonomous Wandering
-            let wanderForce = head.wander();
-            let avoidForce = head.avoid(obstacles);
-            head.applyForce(wanderForce);
-            head.applyForce(avoidForce.mult(2.0));
+        switch (this.currentState) {
+            case BossState.WANDERING:
+                // Normal autonomous movement
+                let wanderForce = head.wander();
+                let avoidForceW = head.avoid(obstacles);
+                head.applyForce(wanderForce);
+                head.applyForce(avoidForceW.mult(2.0));
+                head.update();
+                break;
+
+            case BossState.SEEKING:
+                // Direct movement to a point without wandering
+                if (target) {
+                    let steer = head.seek(target);
+                    head.applyForce(steer);
+                }
+                let avoidForceS = head.avoid(obstacles);
+                head.applyForce(avoidForceS.mult(2.0));
+                head.update();
+                break;
+
+            case BossState.TRACKING:
+                // BODY IS STATIC. Only head tracks target.
+                if (target) {
+                    let dx = target.x - head.position.x;
+                    let dy = target.y - head.position.y;
+                    this.headRotationOverride = atan2(dy, dx);
+                }
+                // We do NOT call head.update() here, so position stays locked.
+                break;
+
+            case BossState.INHALING:
+            case BossState.EXHALING:
+            case BossState.DASHING:
+                // Placeholders for next movesets
+                break;
         }
 
-        head.update();
+        // Segment Following Logic (Trailing behavior)
+        // Skip this in TRACKING state to achieve the "Frozen Body" effect
+        if (this.currentState !== BossState.TRACKING) {
+            for (let i = 1; i < this.segments.length; i++) {
+                let prev = this.segments[i - 1].position;
+                let current = this.segments[i].position;
 
-        // 2. Segment Following Logic
-        for (let i = 1; i < this.segments.length; i++) {
-            let prev = this.segments[i - 1].position;
-            let current = this.segments[i].position;
+                let dx = prev.x - current.x;
+                let dy = prev.y - current.y;
+                let dist = sqrt(dx * dx + dy * dy);
+                let targetDist = this.segmentSize * 0.4;
 
-            // Arrive at a point behind the previous segment
-            // Safe manual subtraction
-            let dx = prev.x - current.x;
-            let dy = prev.y - current.y;
-            let dist = sqrt(dx * dx + dy * dy);
-            let targetDist = this.segmentSize * 0.4; // Tight overlap for scaly look
+                if (dist > targetDist) {
+                    let desiredMag = dist - targetDist;
+                    current.x += (dx / dist) * desiredMag;
+                    current.y += (dy / dist) * desiredMag;
+                }
 
-            if (dist > targetDist) {
-                let desiredMag = dist - targetDist;
-                let desiredX = (dx / dist) * desiredMag;
-                let desiredY = (dy / dist) * desiredMag;
-                current.add(desiredX, desiredY);
+                // Update velocity for heading/rotation
+                this.segments[i].velocity = createVector(dx, dy);
             }
-
-            // Smoothing rotation using manual atan2
-            let angle = atan2(dy, dx);
-            this.segments[i].velocity = p5.Vector.fromAngle(angle);
         }
     }
 
     display() {
-        // Draw tail-to-head
         for (let i = this.segments.length - 1; i >= 0; i--) {
             let seg = this.segments[i];
             let pos = seg.position;
@@ -110,7 +150,6 @@ class FlameSerpent extends Vehicle {
             let isHead = (i === 0);
             let isTailTip = (i === this.segments.length - 1);
 
-            // Calculate size tapering
             let taper;
             if (isHead) taper = 1.2;
             else if (i < 5) taper = map(i, 0, 5, 1.2, 1.0);
@@ -134,138 +173,105 @@ class FlameSerpent extends Vehicle {
     }
 
     drawBodySegment(size, index) {
-        // 1. Flaming Glow
         noStroke();
-        fill(251, 146, 60, 30); // Orange glow
-        ellipse(0, 0, size * 1.8, size * 1.3);
+        // Inner Heat Glow
+        fill(251, 146, 60, 40);
+        ellipse(0, 0, size * 1.5, size * 1.1);
 
-        // 2. Main Body (Darker)
+        // Core Plates
         fill(this.colorDark);
-        ellipse(0, 0, size, size * 0.8);
+        stroke(this.colorMain);
+        strokeWeight(1);
+        ellipse(0, 0, size, size * 0.85);
 
-        // 3. Scales (Procedural details)
-        fill(this.colorMain);
-        let scaleSize = size * 0.3;
-        // Draw 3 scales on top for texture
-        ellipse(size * 0.1, size * 0.1, scaleSize);
-        ellipse(size * 0.1, -size * 0.1, scaleSize);
-        ellipse(-size * 0.1, 0, scaleSize);
-
-        // 4. Thorns (Left and Right - Sharper & Layered)
-        fill(this.colorAccent);
+        // Scales / Heat Details
         noStroke();
-        // Thorn L (Outer)
-        beginShape();
-        vertex(0, -size * 0.35);
-        vertex(-size * 0.6, -size * 0.8);
-        vertex(size * 0.2, -size * 0.35);
-        endShape(CLOSE);
-        // Thorn L (Inner detailing)
-        fill(255, 150, 0, 150);
-        triangle(size * 0.1, -size * 0.35, -size * 0.2, -size * 0.55, -size * 0.1, -size * 0.35);
+        fill(this.colorMain);
+        let scaleSize = size * 0.25;
+        ellipse(size * 0.1, size * 0.15, scaleSize);
+        ellipse(size * 0.1, -size * 0.15, scaleSize);
 
+        // Spike Details
         fill(this.colorAccent);
-        // Thorn R (Outer)
         beginShape();
-        vertex(0, size * 0.35);
-        vertex(-size * 0.6, size * 0.8);
-        vertex(size * 0.2, size * 0.35);
+        vertex(-size * 0.2, -size * 0.4);
+        vertex(-size * 0.5, -size * 0.7);
+        vertex(-size * 0.1, -size * 0.4);
         endShape(CLOSE);
-        // Thorn R (Inner detailing)
-        fill(255, 150, 0, 150);
-        triangle(size * 0.1, size * 0.35, -size * 0.2, size * 0.55, -size * 0.1, size * 0.35);
+        beginShape();
+        vertex(-size * 0.2, size * 0.4);
+        vertex(-size * 0.5, size * 0.7);
+        vertex(-size * 0.1, size * 0.4);
+        endShape(CLOSE);
     }
 
     drawHead(size) {
-        // 1. Massive Glowing Aura
-        fill(251, 191, 36, 40);
-        ellipse(0, 0, size * 2.5);
-        fill(255, 100, 0, 20);
-        ellipse(0, 0, size * 3.5);
+        // 1. Heat Halo
+        fill(255, 68, 68, 50);
+        ellipse(size * 0.3, 0, size * 2.2, size * 1.8);
 
-        // 2. Main Head Structure
+        // 2. Main Diamond Head (Portrait silhouette)
         fill(this.colorDark);
+        stroke(this.colorMain);
+        strokeWeight(2.5);
         beginShape();
-        vertex(-size * 0.5, -size * 0.5); // Back Top
-        vertex(size * 0.2, -size * 0.6);  // Brow peak
-        vertex(size * 0.8, -size * 0.4);  // Upper nose
-        vertex(size * 1.2, 0);            // Snout tip
-        vertex(size * 0.8, size * 0.4);   // Lower nose
-        vertex(size * 0.5, size * 0.6);   // Jaw curve
-        vertex(-size * 0.5, size * 0.5);  // Back Bottom
+        vertex(-size * 0.5, -size * 0.4); // Back Top
+        vertex(size * 0.1, -size * 0.65); // Peak Top
+        vertex(size * 1.25, 0);           // Snout Tip
+        vertex(size * 0.1, size * 0.65);  // Peak Bottom
+        vertex(-size * 0.5, size * 0.4);  // Back Bottom
+        vertex(-size * 0.75, 0);          // Rear
         endShape(CLOSE);
 
-        // 3. Helm Scales (Armored Crown)
-        fill(20, 5, 5); // Near black
-        for (let i = 0; i < 3; i++) {
-            let offset = i * size * 0.25;
-            push();
-            translate(-size * 0.3 + offset, -size * 0.3);
-            rotate(-0.2);
-            beginShape(); // Sharp plate
-            vertex(0, 0);
-            vertex(size * 0.3, -size * 0.1);
-            vertex(size * 0.4, size * 0.1);
-            vertex(0, size * 0.2);
-            endShape(CLOSE);
-            pop();
-        }
-
-        // 4. Sharp Fangs (Visible from jaw)
-        fill(255, 250, 240); // Bone white
-        triangle(size * 0.8, size * 0.2, size * 1.0, size * 0.5, size * 0.6, size * 0.3);
-        triangle(size * 0.8, -size * 0.2, size * 1.0, -size * 0.5, size * 0.6, -size * 0.3);
-
-        // 5. Lateral Fins (Jaw Wings)
+        // 3. Forehead Plate
         fill(this.colorMain);
         noStroke();
-        // Left Fin
         beginShape();
-        vertex(-size * 0.2, -size * 0.4);
-        bezierVertex(-size * 0.8, -size * 1.2, -size * 0.1, -size * 1.5, 0, -size * 0.5);
-        endShape(CLOSE);
-        // Right Fin
-        beginShape();
-        vertex(-size * 0.2, size * 0.4);
-        bezierVertex(-size * 0.8, size * 1.2, -size * 0.1, size * 1.5, 0, size * 0.5);
+        vertex(0, -size * 0.2);
+        vertex(size * 0.5, 0);
+        vertex(0, size * 0.2);
+        vertex(-size * 0.2, 0);
         endShape(CLOSE);
 
-        // 6. Evil Flaming Eyes (Intense Version)
-        let eyeX = size * 0.45;
-        let eyeY = size * 0.25;
-
-        // Eye Socket Shadow
-        fill(0, 150);
-        ellipse(eyeX, eyeY, size * 0.4, size * 0.45);
-        ellipse(eyeX, -eyeY, size * 0.4, size * 0.45);
-
-        // Intense Glow
-        fill(255, 150, 0);
-        ellipse(eyeX + 5, eyeY, size * 0.3);
-        ellipse(eyeX + 5, -eyeY, size * 0.3);
-
-        // Inner Slit (Evil yellow)
-        fill(255, 255, 0);
-        ellipse(eyeX + size * 0.08, eyeY, size * 0.15, size * 0.25);
-        ellipse(eyeX + size * 0.08, -eyeY, size * 0.15, size * 0.25);
-
-        // Sharp Vertical Pupil
-        fill(0);
-        rectMode(CENTER);
-        rect(eyeX + size * 0.1, eyeY, size * 0.03, size * 0.2, 5);
-        rect(eyeX + size * 0.1, -eyeY, size * 0.03, size * 0.2, 5);
-
-        // 7. Flaming Horns (Extended)
-        stroke(this.colorAccent);
-        strokeWeight(4);
-        noFill();
-        line(eyeX - 10, -eyeY - 10, eyeX + 25, -eyeY - 35);
-        line(eyeX - 10, eyeY + 10, eyeX + 25, eyeY + 35);
+        // 4. Fangs (Sharp, White)
+        fill(255);
         noStroke();
+        // Upper Fang
+        triangle(size * 0.9, size * 0.1, size * 1.15, size * 0.35, size * 0.8, size * 0.1);
+        // Lower Fang
+        triangle(size * 0.9, -size * 0.1, size * 1.15, -size * 0.35, size * 0.8, -size * 0.1);
+
+        // 5. Horns (Sharp & Swept Back like portrait)
+        fill(this.colorDark);
+        stroke(this.colorAccent);
+        strokeWeight(2);
+        // Top Horn
+        beginShape();
+        vertex(-size * 0.4, -size * 0.5);
+        vertex(-size * 1.5, -size * 1.0);
+        vertex(-size * 0.6, -size * 0.35);
+        endShape(CLOSE);
+        // Bottom Horn
+        beginShape();
+        vertex(-size * 0.4, size * 0.5);
+        vertex(-size * 1.5, size * 1.0);
+        vertex(-size * 0.6, size * 0.35);
+        endShape(CLOSE);
+
+        // 6. Eyes (Glow Yellow)
+        let eyeX = size * 0.4;
+        let eyeY = size * 0.3;
+        fill(255, 230, 0);
+        ellipse(eyeX, -eyeY, size * 0.35, size * 0.2);
+        ellipse(eyeX, eyeY, size * 0.35, size * 0.2);
+
+        // Pupil
+        fill(0);
+        ellipse(eyeX + size * 0.05, -eyeY, size * 0.1, size * 0.15);
+        ellipse(eyeX + size * 0.05, eyeY, size * 0.1, size * 0.15);
     }
 
     drawTailTip(size) {
-        // Pointy "Blade" Tail
         fill(this.colorDark);
         stroke(this.colorAccent);
         strokeWeight(2);
@@ -277,35 +283,17 @@ class FlameSerpent extends Vehicle {
         endShape(CLOSE);
     }
 
-    /**
-     * Checks if the player snake's head collides with any part of the boss.
-     * @param {Snake} playerSnake 
-     * @returns {p5.Vector|null}
-     */
     checkCollision(playerSnake) {
         if (!playerSnake || playerSnake.segments.length === 0) return null;
-
         const playerHead = playerSnake.segments[0].position;
-
-        // We only check the player's head against the boss's segments
         for (let i = 0; i < this.segments.length; i++) {
             const bossSeg = this.segments[i].position;
-            // Safe manual distance calculation to avoid potential p5.Vector internal errors
             const dx = playerHead.x - bossSeg.x;
             const dy = playerHead.y - bossSeg.y;
             const dist = sqrt(dx * dx + dy * dy);
-
-            // Tapered collision radius
-            let taper;
-            if (i === 0) taper = 1.2;
-            else if (i < 5) taper = map(i, 0, 5, 1.2, 1.0);
-            else taper = map(i, 5, this.segments.length, 1.0, 0.4);
-
-            const bossRadius = (this.segmentSize * taper) * 0.7; // Thorns add reach
-
-            if (dist < bossRadius + 15) { // 15 is a small buffer for player head
-                return bossSeg.copy();
-            }
+            let taper = i === 0 ? 1.2 : (i < 5 ? map(i, 0, 5, 1.2, 1.0) : map(i, 5, this.segments.length, 1.0, 0.4));
+            const bossRadius = (this.segmentSize * taper) * 0.7;
+            if (dist < bossRadius + 15) return bossSeg.copy();
         }
         return null;
     }
