@@ -718,13 +718,16 @@ function updateGame() {
             let selfCollision = currentBoss ? false : snake.checkSelfCollision();
 
             let collisionPoint = (bossEntity && bossEntity.checkCollision(snake));
+            let fireballPoint = (bossEntity && bossEntity.checkFireballCollisions(snake));
+
             if (selfCollision ||
                 snake.checkObstacleCollision(obstacles) ||
                 snake.checkEnemyCollision(toxicSnakes) ||
-                collisionPoint) {
+                collisionPoint ||
+                fireballPoint) {
 
                 if (currentBoss) {
-                    takeDamage(collisionPoint);
+                    takeDamage(collisionPoint || fireballPoint);
                 } else {
                     triggerGameOver();
                     return; // Stop processing frame immediately
@@ -742,6 +745,33 @@ function updateGame() {
 
         let avoidForce = head.avoid(obstacles);
         head.applyForce(avoidForce);
+
+        // --- BOSS INHALE SUCTION FORCE ---
+        if (bossEntity && bossEntity.currentState === BossState.INHALING) {
+            let mouthPos = bossEntity.segments[0].position.copy();
+            let toPlayer = p5.Vector.sub(head.position, mouthPos);
+            let dist = toPlayer.mag();
+
+            // Only pull if within range
+            if (dist < 700) {
+                // Directional Check: Is player in the 60-degree scope?
+                let headAngle = bossEntity.headRotationOverride || bossEntity.segments[0].velocity.heading();
+                let angleToPlayer = toPlayer.heading();
+                let diff = abs(headAngle - angleToPlayer);
+                if (diff > PI) diff = TWO_PI - diff; // Handle wrap-around
+
+                if (diff < PI / 6) { // 30° each side
+                    let suctionDir = p5.Vector.sub(mouthPos, head.position);
+                    suctionDir.normalize();
+                    // Gentle pull that increases as you get closer
+                    let strength = map(dist, 0, 700, 1.8, 0.4);
+                    head.applyForce(suctionDir.mult(strength));
+
+                    // Add minor screen shake during inhale
+                    screenShake = 1.5;
+                }
+            }
+        }
 
         for (let ts of toxicSnakes) {
             // update enemy behavior only during normal gameplay
@@ -765,6 +795,14 @@ function updateGame() {
 
         if (bossEntity) {
             bossEntity.update(obstacles, snake.segments[0].position);
+
+            // --- BOSS STATE LOGIC ---
+            // Simple logic for state transitions for now
+            if (bossEntity.currentState === BossState.TRACKING && bossEntity.stateTimer > 180) {
+                bossEntity.setState(BossState.INHALING);
+            } else if (bossEntity.currentState === BossState.INHALING && bossEntity.stateTimer > 150) {
+                bossEntity.setState(BossState.TRACKING);
+            }
         }
     }
 
