@@ -2,8 +2,8 @@ class FlameSerpent extends Vehicle {
     constructor(x, y) {
         super(x, y);
         this.segments = [];
-        this.numSegments = 45; // Boss is long!
-        this.segmentSize = 65; // Boss is big!
+        this.numSegments = 75; // Boss is gargantuan!
+        this.segmentSize = 95; // Boss is wide!
 
         // Stats
         this.maxSpeed = 3; // Slow but majestic
@@ -39,17 +39,21 @@ class FlameSerpent extends Vehicle {
             let current = this.segments[i].position;
 
             // Arrive at a point behind the previous segment
-            let desired = p5.Vector.sub(prev, current);
-            let dist = desired.mag();
+            // Safe manual subtraction
+            let dx = prev.x - current.x;
+            let dy = prev.y - current.y;
+            let dist = sqrt(dx * dx + dy * dy);
             let targetDist = this.segmentSize * 0.4; // Tight overlap for scaly look
 
             if (dist > targetDist) {
-                desired.setMag(dist - targetDist);
-                current.add(desired);
+                let desiredMag = dist - targetDist;
+                let desiredX = (dx / dist) * desiredMag;
+                let desiredY = (dy / dist) * desiredMag;
+                current.add(desiredX, desiredY);
             }
 
-            // Smoothing rotation
-            let angle = p5.Vector.sub(prev, current).heading();
+            // Smoothing rotation using manual atan2
+            let angle = atan2(dy, dx);
             this.segments[i].velocity = p5.Vector.fromAngle(angle);
         }
     }
@@ -104,62 +108,117 @@ class FlameSerpent extends Vehicle {
         ellipse(size * 0.1, -size * 0.1, scaleSize);
         ellipse(-size * 0.1, 0, scaleSize);
 
-        // 4. Thorns (Left and Right)
+        // 4. Thorns (Left and Right - Sharper & Layered)
         fill(this.colorAccent);
         noStroke();
-        // Thorn L
+        // Thorn L (Outer)
         beginShape();
         vertex(0, -size * 0.35);
-        vertex(-size * 0.4, -size * 0.7);
+        vertex(-size * 0.6, -size * 0.8);
         vertex(size * 0.2, -size * 0.35);
         endShape(CLOSE);
-        // Thorn R
+        // Thorn L (Inner detailing)
+        fill(255, 150, 0, 150);
+        triangle(size * 0.1, -size * 0.35, -size * 0.2, -size * 0.55, -size * 0.1, -size * 0.35);
+
+        fill(this.colorAccent);
+        // Thorn R (Outer)
         beginShape();
         vertex(0, size * 0.35);
-        vertex(-size * 0.4, size * 0.7);
+        vertex(-size * 0.6, size * 0.8);
         vertex(size * 0.2, size * 0.35);
         endShape(CLOSE);
+        // Thorn R (Inner detailing)
+        fill(255, 150, 0, 150);
+        triangle(size * 0.1, size * 0.35, -size * 0.2, size * 0.55, -size * 0.1, size * 0.35);
     }
 
     drawHead(size) {
-        // 1. Large Glowing Aura
-        fill(251, 191, 36, 50);
-        ellipse(0, 0, size * 2.2);
+        // 1. Massive Glowing Aura
+        fill(251, 191, 36, 40);
+        ellipse(0, 0, size * 2.5);
+        fill(255, 100, 0, 20);
+        ellipse(0, 0, size * 3.5);
 
-        // 2. Head Shape
+        // 2. Main Head Structure
         fill(this.colorDark);
         beginShape();
-        vertex(-size * 0.5, -size * 0.4);
-        vertex(size * 0.7, -size * 0.3);
-        vertex(size, 0);
-        vertex(size * 0.7, size * 0.3);
-        vertex(-size * 0.5, size * 0.4);
+        vertex(-size * 0.5, -size * 0.5); // Back Top
+        vertex(size * 0.2, -size * 0.6);  // Brow peak
+        vertex(size * 0.8, -size * 0.4);  // Upper nose
+        vertex(size * 1.2, 0);            // Snout tip
+        vertex(size * 0.8, size * 0.4);   // Lower nose
+        vertex(size * 0.5, size * 0.6);   // Jaw curve
+        vertex(-size * 0.5, size * 0.5);  // Back Bottom
         endShape(CLOSE);
 
-        // 3. Evil Flaming Eyes
-        let eyeX = size * 0.4;
-        let eyeY = size * 0.2;
+        // 3. Helm Scales (Armored Crown)
+        fill(20, 5, 5); // Near black
+        for (let i = 0; i < 3; i++) {
+            let offset = i * size * 0.25;
+            push();
+            translate(-size * 0.3 + offset, -size * 0.3);
+            rotate(-0.2);
+            beginShape(); // Sharp plate
+            vertex(0, 0);
+            vertex(size * 0.3, -size * 0.1);
+            vertex(size * 0.4, size * 0.1);
+            vertex(0, size * 0.2);
+            endShape(CLOSE);
+            pop();
+        }
 
-        // Outer Glow
-        fill(255, 100, 0);
-        ellipse(eyeX, eyeY, size * 0.3);
-        ellipse(eyeX, -eyeY, size * 0.3);
+        // 4. Sharp Fangs (Visible from jaw)
+        fill(255, 250, 240); // Bone white
+        triangle(size * 0.8, size * 0.2, size * 1.0, size * 0.5, size * 0.6, size * 0.3);
+        triangle(size * 0.8, -size * 0.2, size * 1.0, -size * 0.5, size * 0.6, -size * 0.3);
 
-        // Inner Slit (Evil)
+        // 5. Lateral Fins (Jaw Wings)
+        fill(this.colorMain);
+        noStroke();
+        // Left Fin
+        beginShape();
+        vertex(-size * 0.2, -size * 0.4);
+        bezierVertex(-size * 0.8, -size * 1.2, -size * 0.1, -size * 1.5, 0, -size * 0.5);
+        endShape(CLOSE);
+        // Right Fin
+        beginShape();
+        vertex(-size * 0.2, size * 0.4);
+        bezierVertex(-size * 0.8, size * 1.2, -size * 0.1, size * 1.5, 0, size * 0.5);
+        endShape(CLOSE);
+
+        // 6. Evil Flaming Eyes (Intense Version)
+        let eyeX = size * 0.45;
+        let eyeY = size * 0.25;
+
+        // Eye Socket Shadow
+        fill(0, 150);
+        ellipse(eyeX, eyeY, size * 0.4, size * 0.45);
+        ellipse(eyeX, -eyeY, size * 0.4, size * 0.45);
+
+        // Intense Glow
+        fill(255, 150, 0);
+        ellipse(eyeX + 5, eyeY, size * 0.3);
+        ellipse(eyeX + 5, -eyeY, size * 0.3);
+
+        // Inner Slit (Evil yellow)
         fill(255, 255, 0);
-        ellipse(eyeX + size * 0.05, eyeY, size * 0.15, size * 0.25);
-        ellipse(eyeX + size * 0.05, -eyeY, size * 0.15, size * 0.25);
+        ellipse(eyeX + size * 0.08, eyeY, size * 0.15, size * 0.25);
+        ellipse(eyeX + size * 0.08, -eyeY, size * 0.15, size * 0.25);
 
-        fill(0); // Pupil
-        ellipse(eyeX + size * 0.08, eyeY, size * 0.02, size * 0.15);
-        ellipse(eyeX + size * 0.08, -eyeY, size * 0.02, size * 0.15);
+        // Sharp Vertical Pupil
+        fill(0);
+        rectMode(CENTER);
+        rect(eyeX + size * 0.1, eyeY, size * 0.03, size * 0.2, 5);
+        rect(eyeX + size * 0.1, -eyeY, size * 0.03, size * 0.2, 5);
 
-        // 4. Flaming "Eyebrows"/Horns
+        // 7. Flaming Horns (Extended)
         stroke(this.colorAccent);
-        strokeWeight(3);
+        strokeWeight(4);
         noFill();
-        line(eyeX - 5, -eyeY - 5, eyeX + 10, -eyeY - 15);
-        line(eyeX - 5, eyeY + 5, eyeX + 10, eyeY + 15);
+        line(eyeX - 10, -eyeY - 10, eyeX + 25, -eyeY - 35);
+        line(eyeX - 10, eyeY + 10, eyeX + 25, eyeY + 35);
+        noStroke();
     }
 
     drawTailTip(size) {
@@ -188,7 +247,10 @@ class FlameSerpent extends Vehicle {
         // We only check the player's head against the boss's segments
         for (let i = 0; i < this.segments.length; i++) {
             const bossSeg = this.segments[i].position;
-            const dist = p5.Vector.dist(playerHead, bossSeg);
+            // Safe manual distance calculation to avoid potential p5.Vector internal errors
+            const dx = playerHead.x - bossSeg.x;
+            const dy = playerHead.y - bossSeg.y;
+            const dist = sqrt(dx * dx + dy * dy);
 
             // Tapered collision radius
             let taper;

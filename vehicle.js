@@ -26,15 +26,17 @@ class Vehicle {
     }
 
     seek(target) {
-        let desired = p5.Vector.sub(target, this.position);
+        // Safe manual/instance-based vector subtraction
+        let desired = target.copy().sub(this.position);
         desired.setMag(this.maxSpeed);
-        let steer = p5.Vector.sub(desired, this.velocity);
+        let steer = desired.sub(this.velocity);
         steer.limit(this.maxForce);
         return steer;
     }
 
     arrive(target, range = 100, stopDistance = 0) {
-        let desired = p5.Vector.sub(target, this.position);
+        // Safe manual/instance-based vector subtraction
+        let desired = target.copy().sub(this.position);
         let d = desired.mag();
         if (d < stopDistance) {
             this.velocity.mult(0);
@@ -46,7 +48,7 @@ class Vehicle {
         } else {
             desired.setMag(this.maxSpeed);
         }
-        let steer = p5.Vector.sub(desired, this.velocity);
+        let steer = desired.sub(this.velocity);
         steer.limit(this.maxForce);
         return steer;
     }
@@ -104,8 +106,9 @@ class Vehicle {
         let ahead2 = ahead.copy();
         ahead2.mult(0.5);
 
-        let pointAuBoutDeAhead = p5.Vector.add(this.position, ahead);
-        let pointAuBoutDeAhead2 = p5.Vector.add(this.position, ahead2);
+        // Safe manual addition for look-ahead points
+        let pointAuBoutDeAhead = createVector(this.position.x + ahead.x, this.position.y + ahead.y);
+        let pointAuBoutDeAhead2 = createVector(this.position.x + ahead2.x, this.position.y + ahead2.y);
 
         let obstacleLePlusProche = this.getObstacleLePlusProche(obstacles);
 
@@ -122,9 +125,10 @@ class Vehicle {
         if (distance < (obstacleLePlusProche.r || 30) + avoidanceZone) {
             let force;
             if (distance1 < distance2) {
-                force = p5.Vector.sub(pointAuBoutDeAhead, obstacleLePlusProche.position);
+                // Safe manual subtraction
+                force = createVector(pointAuBoutDeAhead.x - obstacleLePlusProche.position.x, pointAuBoutDeAhead.y - obstacleLePlusProche.position.y);
             } else {
-                force = p5.Vector.sub(pointAuBoutDeAhead2, obstacleLePlusProche.position);
+                force = createVector(pointAuBoutDeAhead2.x - obstacleLePlusProche.position.x, pointAuBoutDeAhead2.y - obstacleLePlusProche.position.y);
             }
 
             force.setMag(this.maxSpeed);
@@ -139,9 +143,14 @@ class Vehicle {
         let steer = createVector(0, 0);
         let count = 0;
         for (let target of targets) {
-            let d = p5.Vector.dist(this.position, target);
+            let pos = target.position || target;
+            // Safe manual distance calculation
+            let dx = this.position.x - pos.x;
+            let dy = this.position.y - pos.y;
+            let d = sqrt(dx * dx + dy * dy);
+
             if (d > 0 && d < radius) {
-                let diff = p5.Vector.sub(this.position, target);
+                let diff = createVector(dx, dy); // this.position - pos
                 diff.normalize();
                 diff.div(d); // Weight by distance
                 steer.add(diff);
@@ -155,6 +164,51 @@ class Vehicle {
             steer.limit(this.maxForce);
         }
         return steer;
+    }
+
+    align(vehicles, radius = 100) {
+        let sum = createVector(0, 0);
+        let count = 0;
+        for (let other of vehicles) {
+            // Safe manual distance
+            let dx = this.position.x - other.position.x;
+            let dy = this.position.y - other.position.y;
+            let d = sqrt(dx * dx + dy * dy);
+
+            if (d > 0 && d < radius) {
+                sum.add(other.velocity);
+                count++;
+            }
+        }
+        if (count > 0) {
+            sum.div(count);
+            sum.setMag(this.maxSpeed);
+            let steer = sum.copy().sub(this.velocity);
+            steer.limit(this.maxForce);
+            return steer;
+        }
+        return createVector(0, 0);
+    }
+
+    cohesion(vehicles, radius = 100) {
+        let sum = createVector(0, 0);
+        let count = 0;
+        for (let other of vehicles) {
+            // Safe manual distance
+            let dx = this.position.x - other.position.x;
+            let dy = this.position.y - other.position.y;
+            let d = sqrt(dx * dx + dy * dy);
+
+            if (d > 0 && d < radius) {
+                sum.add(other.position);
+                count++;
+            }
+        }
+        if (count > 0) {
+            sum.div(count);
+            return this.seek(sum);
+        }
+        return createVector(0, 0);
     }
 
     boundaries(d) {
@@ -173,7 +227,7 @@ class Vehicle {
 
         if (desired !== null) {
             desired.setMag(this.maxSpeed);
-            let steer = p5.Vector.sub(desired, this.velocity);
+            let steer = desired.copy().sub(this.velocity);
             steer.limit(this.maxForce * 2.5); // Stronger reinforcement
             this.applyForce(steer);
         }

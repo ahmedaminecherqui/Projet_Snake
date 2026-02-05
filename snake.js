@@ -60,9 +60,14 @@ class Snake extends Vehicle {
             // 2. Enemy Evasion: Avoid toxic snakes
             let evadeForce = createVector(0, 0);
             for (let enemy of toxicSnakes) {
-                let d = p5.Vector.dist(head.position, enemy.segments[0].position);
-                if (d < 350) { // Increased detection range
-                    evadeForce.add(head.evade(enemy.segments[0]));
+                if (enemy && enemy.segments && enemy.segments.length > 0) {
+                    // Safe manual distance check
+                    let dx = head.position.x - enemy.segments[0].position.x;
+                    let dy = head.position.y - enemy.segments[0].position.y;
+                    let d = sqrt(dx * dx + dy * dy);
+                    if (d < 350) { // Increased detection range
+                        evadeForce.add(head.evade(enemy.segments[0]));
+                    }
                 }
             }
 
@@ -129,13 +134,17 @@ class Snake extends Vehicle {
 
             // 2. HARD CONSTRAINT (Fixes gaps/detaching)
             // If segment is too far, pull it back instantly
-            let dist = p5.Vector.dist(segment.position, prev.position);
+            // Safe manual distance
+            let dx = segment.position.x - prev.position.x;
+            let dy = segment.position.y - prev.position.y;
+            let dist = sqrt(dx * dx + dy * dy);
+
             const MAX_DIST = 14;
             if (dist > MAX_DIST) {
-                let dir = p5.Vector.sub(segment.position, prev.position);
+                let dir = createVector(dx, dy);
                 dir.setMag(MAX_DIST); // Clamp to max distance
-                segment.position = p5.Vector.add(prev.position, dir);
-                segment.velocity.mult(0.9); // Dampen velocity to prevent snapping oscillation
+                segment.position = createVector(prev.position.x + dir.x, prev.position.y + dir.y);
+                segment.velocity.mult(0.9); // Dampen velocity
             }
         }
     }
@@ -252,7 +261,9 @@ class Snake extends Vehicle {
 
     eat(food) {
         let head = this.segments[0];
-        let d = p5.Vector.dist(head.position, food.position);
+        let dx = head.position.x - food.position.x;
+        let dy = head.position.y - food.position.y;
+        let d = sqrt(dx * dx + dy * dy);
         if (d < 50) {
             this.addSegment();
             return true;
@@ -263,7 +274,9 @@ class Snake extends Vehicle {
     checkSelfCollision() {
         let head = this.segments[0];
         for (let i = 6; i < this.segments.length; i++) {
-            let d = p5.Vector.dist(head.position, this.segments[i].position);
+            let dx = head.position.x - this.segments[i].position.x;
+            let dy = head.position.y - this.segments[i].position.y;
+            let d = sqrt(dx * dx + dy * dy);
             if (d < 15) return true;
         }
         return false;
@@ -272,7 +285,9 @@ class Snake extends Vehicle {
     checkObstacleCollision(obstacles) {
         let head = this.segments[0];
         for (let obs of obstacles) {
-            let d = p5.Vector.dist(head.position, obs.position);
+            let dx = head.position.x - obs.position.x;
+            let dy = head.position.y - obs.position.y;
+            let d = sqrt(dx * dx + dy * dy);
             // Increased headRadius buffer (16 instead of 12.5) for instant-kill feel
             let headRadius = 16;
             let obsR = obs.r || 30;
@@ -290,7 +305,9 @@ class Snake extends Vehicle {
         let head = this.segments[0];
         for (let enemy of toxicSnakes) {
             for (let segment of enemy.segments) {
-                let d = p5.Vector.dist(head.position, segment.position);
+                let dx = head.position.x - segment.position.x;
+                let dy = head.position.y - segment.position.y;
+                let d = sqrt(dx * dx + dy * dy);
                 // Using 25 as distance threshold for body segments
                 if (d < 25) return true;
             }

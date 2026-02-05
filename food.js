@@ -34,7 +34,8 @@ class Food {
         }
 
         // Easing for a nice "pop-in" effect
-        let scaleVal = p5.Vector.lerp(createVector(0, 0), createVector(1, 1), this.spawnProgress).x;
+        // Safe manual interpolation for scale
+        let scaleVal = lerp(0, 1, this.spawnProgress);
         // Add a slight overshoot for juice/bounce feel
         let bounce = sin(this.spawnProgress * PI) * 0.2 * (1 - this.spawnProgress);
         let finalScale = scaleVal + bounce;

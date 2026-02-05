@@ -12,6 +12,7 @@ let bossRenderer; // Handles boss environment visuals
 let bossEntity = null; // The actual boss character
 let lives = 3;
 let invulnerableTimer = 0;
+let batFlock; // Foreground bat flock system
 
 // Assets
 let mascotImg;
@@ -232,6 +233,8 @@ function setup() {
             }
         }
     });
+
+    batFlock = new BatFlock();
 }
 
 function startGame() {
@@ -265,8 +268,11 @@ function resetGame() {
     // Initialize Boss Renderer if active
     if (currentBoss) {
         bossRenderer.init(currentBoss);
-        if (currentBoss.bossId === 'flame-serpent') {
+        // Correct check — currentBoss is the bossId string
+        if (currentBoss === 'flame-serpent') {
             bossEntity = new FlameSerpent(width * 0.8, height / 2);
+            // Force an immediate bat pulse for atmosphere
+            if (batFlock) batFlock.triggerPulse();
         }
     } else {
         bossRenderer.stop();
@@ -335,7 +341,10 @@ function initObstacles() {
         do {
             tooClose = false;
             obsPos = createVector(random(50, width - 50), random(50, height - 50));
-            if (p5.Vector.dist(obsPos, createVector(width / 2, height / 2)) < 150) tooClose = true;
+            let dx = obsPos.x - width / 2;
+            let dy = obsPos.y - height / 2;
+            let d = sqrt(dx * dx + dy * dy);
+            if (d < 150) tooClose = true;
             attempts++;
         } while (tooClose && attempts < 100);
         obstacles.push(new Obstacle(obsPos.x, obsPos.y, random(25, 40)));
@@ -387,6 +396,12 @@ function draw() {
 
     if (gameState === START && menuSnake) {
         updateMainMenu();
+    }
+
+    // 5. LAYER: ABSOLUTE FOREGROUND
+    if (batFlock) {
+        batFlock.update();
+        batFlock.display();
     }
 }
 
@@ -540,7 +555,9 @@ function updateCompleting() {
         let v = allVehicles[i];
         let target = formationTargets[i];
 
-        let d = p5.Vector.dist(v.position, target);
+        let dx = v.position.x - target.x;
+        let dy = v.position.y - target.y;
+        let d = sqrt(dx * dx + dy * dy);
 
         if (d < 1.5) {
             // SNAP & LOCK
@@ -658,7 +675,8 @@ function updateGame() {
         }
     }
 
-    if (head) {
+    if (snake && snake.segments.length > 0) {
+        let head = snake.segments[0];
         // --- PROACTIVE COLLISION CHECK ---
         // Check collisions BEFORE updating position to prevent "bobbing" or penetration
         if (currentDifficultyLevel !== 'test') {
@@ -697,7 +715,11 @@ function updateGame() {
             ts.update(obstacles, snake);
             let enemyHead = ts.segments[0];
             if (enemyHead) {
-                let d = p5.Vector.dist(head.position, enemyHead.position);
+                // Safe manual distance calculation
+                let dx = head.position.x - enemyHead.position.x;
+                let dy = head.position.y - enemyHead.position.y;
+                let d = sqrt(dx * dx + dy * dy);
+
                 if (d < 150) {
                     let evadeForce = head.evade(enemyHead);
                     head.applyForce(evadeForce.mult(0.8));
@@ -816,7 +838,8 @@ function takeDamage(hitPoint = null) {
 
         // PUSHBACK/KNOCKBACK LOGIC
         if (hitPoint) {
-            let pushDir = p5.Vector.sub(snake.segments[0].position, hitPoint);
+            // Safe instance-based vector sub
+            let pushDir = snake.segments[0].position.copy().sub(hitPoint);
             pushDir.setMag(15); // Powerful impulse
             snake.segments[0].velocity.add(pushDir);
             snake.segments[0].position.add(pushDir); // Instant shift
@@ -929,11 +952,11 @@ class Particle {
     }
     update() {
         if (this.isConverging && this.lifespan > 100) {
-            // Move toward target position smoothly
-            let targetPos = createVector(this.targetX, this.targetY);
-            let direction = p5.Vector.sub(targetPos, this.pos);
-            direction.mult(this.convergeSpeed);
-            this.pos.add(direction);
+            // Move toward target position smoothly (Manual stable math)
+            let dx = this.targetX - this.pos.x;
+            let dy = this.targetY - this.pos.y;
+            this.pos.x += dx * this.convergeSpeed;
+            this.pos.y += dy * this.convergeSpeed;
         } else {
             // Normal particle behavior (slight drift after convergence)
             this.vel.add(this.acc);
@@ -1095,7 +1118,10 @@ function mousePressed() {
     // Try to find an obstacle to drag
     let mousePos = createVector(mouseX, mouseY);
     for (let obs of obstacles) {
-        if (p5.Vector.dist(mousePos, obs.position) < obs.r) {
+        let dx = mousePos.x - obs.position.x;
+        let dy = mousePos.y - obs.position.y;
+        let d = sqrt(dx * dx + dy * dy);
+        if (d < obs.r) {
             draggedObstacle = obs;
             return;
         }
