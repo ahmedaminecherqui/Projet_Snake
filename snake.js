@@ -150,10 +150,47 @@ class Snake extends Vehicle {
     }
 
     dash() {
-        if (this.dashCooldown <= 0) {
-            this.dashTimer = 45; // Extended duration (0.75s)
-            this.dashCooldown = 90; // 1.5s cooldown
+        // Instant dash forward - no cooldown, but has visual duration
+        if (this.segments.length > 0) {
+            let head = this.segments[0];
+
+            // Activate dash timer for visual trail and speed boost
+            this.dashTimer = 45; // 0.75s of enhanced speed and trail
+
+            // Get forward direction (current velocity direction)
+            let dashDirection = head.velocity.copy().normalize();
+            if (dashDirection.mag() === 0) {
+                // If not moving, dash in the direction of mouse
+                dashDirection = p5.Vector.sub(createVector(mouseX, mouseY), head.position).normalize();
+            }
+
+            // Apply instant forward boost
+            let dashBoost = dashDirection.mult(15); // Smaller initial boost since speed continues
+            head.position.add(dashBoost);
+
+
             return true;
+        }
+        return false;
+    }
+
+    checkHeadbuttDamage(bossEntity) {
+        if (!bossEntity || !bossEntity.isStunned || !bossEntity.segments || bossEntity.segments.length === 0) return false;
+
+        // Headbutt logic: Dash into boss head while it is stunned
+        let head = this.segments[0];
+        let bossHead = bossEntity.segments[0].position;
+
+        let d = dist(head.position.x, head.position.y, bossHead.x, bossHead.y);
+
+        // Check if close enough and player is dashing (or moving fast)
+        if (d < 120 && (this.isDashing || this.dashTimer > 0)) {
+            // Apply knockback to player to simulate impact (recoil)
+            let recoil = p5.Vector.sub(head.position, bossHead).normalize().mult(40);
+            head.position.add(recoil);
+            head.velocity.mult(-0.5); // Reverse velocity
+
+            return true; // Damage dealt
         }
         return false;
     }

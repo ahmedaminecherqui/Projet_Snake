@@ -299,11 +299,7 @@ class FlameSerpent {
         this.inhaleParticles = [];
         this.fireballs = [];
         this.thorns = [];
-
-        // Stun mechanics
-        this.isStunned = false;
-        this.stunTimer = 0;
-        this.eyesClosed = false;
+        this.fallingRocks = [];
 
         // Cycle Logic
         this.comboCount = 0;
@@ -313,10 +309,6 @@ class FlameSerpent {
         this.dashDirection = null;
         this.dashSpeed = 25;
         this.dashDuration = 50; // frames
-
-        // Test Mode Helpers
-        this.lastHealth = this.health;
-        this.damageReactionTimer = 0;
     }
 
     setState(newState) {
@@ -356,26 +348,6 @@ class FlameSerpent {
     }
 
     update(obstacles = [], target = null) {
-        // Test Mode Logic: Force Stun (unless dying)
-        if (typeof currentDifficultyLevel !== 'undefined' && currentDifficultyLevel === 'test_stun' && this.currentState !== BossState.DYING) {
-            this.currentState = BossState.STUNNED;
-            this.isStunned = true;
-            this.stunTimer = 100; // Keep timer active so state logic runs but never finishes
-
-            // Damage Reaction (Eyes Open)
-            if (this.health < this.lastHealth) {
-                this.damageReactionTimer = 20; // 20 frames of open eyes
-                this.lastHealth = this.health;
-            }
-
-            if (this.damageReactionTimer > 0) {
-                this.eyesClosed = false;
-                this.damageReactionTimer--;
-            } else {
-                this.eyesClosed = true;
-            }
-        }
-
         this.stateTimer++;
         let head = this.segments[0];
 
@@ -398,15 +370,6 @@ class FlameSerpent {
                 head.velocity.limit(head.maxSpeed);
                 head.position.add(head.velocity);
                 head.acceleration.mult(0);
-
-                // Keep boss on-screen during wandering
-                let margin = 100;
-                let returnForce = createVector(0, 0);
-                if (head.position.x < margin) returnForce.x = 2;
-                if (head.position.x > width - margin) returnForce.x = -2;
-                if (head.position.y < margin) returnForce.y = 2;
-                if (head.position.y > height - margin) returnForce.y = -2;
-                head.velocity.add(returnForce);
 
                 // Random Attacks while wandering - Increased frequency
                 if (this.stateTimer > 40 && frameCount % 60 === 0) {
@@ -452,35 +415,13 @@ class FlameSerpent {
                 // External effects
                 if (typeof screenShake !== 'undefined') screenShake = 8;
 
-                // if (frameCount % 6 === 0) {
-                //     this.fallingRocks.push(new FallingRock());
-                // }
-
-                // // Clear landed rocks when new rocks start falling
-                // if (this.stateTimer === 1) {
-                //     this.clearLandedRocks();
-                // }
-
-                // Check border collision and stun
-                let hitBorder = false;
-                if (head.position.x < 50 || head.position.x > width - 50 ||
-                    head.position.y < 50 || head.position.y > height - 50) {
-                    hitBorder = true;
+                if (frameCount % 6 === 0) {
+                    this.fallingRocks.push(new FallingRock());
                 }
 
-                if (hitBorder) {
-                    // Knock back
-                    head.velocity.mult(-0.5);
-                    head.position.add(head.velocity);
-
-                    // Stun the boss
-                    this.setState(BossState.STUNNED);
-                    this.stunTimer = 300; // 5 seconds
-                    this.eyesClosed = true;
-                    this.isStunned = true;
-
-                    // Visual feedback
-                    if (typeof screenShake !== 'undefined') screenShake = 12;
+                // Clear landed rocks when new rocks start falling
+                if (this.stateTimer === 1) {
+                    this.clearLandedRocks();
                 }
 
                 if (this.stateTimer > this.dashDuration) {
@@ -499,42 +440,6 @@ class FlameSerpent {
                 let avoidForceS = head.avoid(obstacles);
                 head.applyForce(avoidForceS.mult(2.0));
                 head.update();
-                break;
-
-            case BossState.STUNNED:
-                // Boss is stunned - stationary with closed eyes
-                this.stunTimer--;
-                if (this.stunTimer <= 0) {
-                    this.eyesClosed = false;
-                    this.isStunned = false;
-                    this.setState(BossState.TRACKING);
-                    this.comboCount = 0;
-                    this.maxCombos = floor(random(1, 5));
-                }
-                // Boss remains stationary - no movement
-                break;
-
-            case BossState.DYING:
-                // Cinematic Death: Explode segments from tail to head
-                this.isStunned = true; // Ensure no damage during death anim
-                this.eyesClosed = true; // Eyes closed in death
-
-                // Explode one segment every 4 frames
-                if (frameCount % 4 === 0 && this.segments.length > 0) {
-                    let segment = this.segments.pop(); // Remove tail
-
-                    // Explosion Effect
-                    if (typeof particles !== 'undefined') {
-                        particles.burst(segment.position.x, segment.position.y, this.colorMain, 40);
-                        particles.burst(segment.position.x, segment.position.y, this.colorAccent, 25);
-                    }
-                    if (typeof screenShake !== 'undefined') screenShake = 5;
-                }
-
-                // Final Death Trigger
-                if (this.segments.length === 0) {
-                    this.isDead = true;
-                }
                 break;
 
             case BossState.TRACKING:
@@ -652,6 +557,12 @@ class FlameSerpent {
         }
 
         // Update Falling Rocks
+        for (let i = this.fallingRocks.length - 1; i >= 0; i--) {
+            this.fallingRocks[i].update();
+            if (!this.fallingRocks[i].alive) {
+                this.fallingRocks.splice(i, 1);
+            }
+        }
     }
 
     shootBigFireball() {
@@ -732,6 +643,10 @@ class FlameSerpent {
             th.display();
         }
 
+        // Draw Falling Rocks
+        for (let rock of this.fallingRocks) {
+            rock.display();
+        }
     }
 
     displayInhale() {
@@ -826,30 +741,13 @@ class FlameSerpent {
 
         let eyeX = size * 0.4;
         let eyeY = size * 0.3;
+        fill(255, 230, 0);
+        ellipse(eyeX, -eyeY, size * 0.35, size * 0.2);
+        ellipse(eyeX, eyeY, size * 0.35, size * 0.2);
 
-        if (this.eyesClosed) {
-            // Closed eyes (X shape)
-            stroke(0);
-            strokeWeight(3);
-
-            // Left eye X
-            line(eyeX - size * 0.15, -eyeY - size * 0.1, eyeX + size * 0.15, -eyeY + size * 0.1);
-            line(eyeX + size * 0.15, -eyeY - size * 0.1, eyeX - size * 0.15, -eyeY + size * 0.1);
-
-            // Right eye X
-            line(eyeX - size * 0.15, eyeY - size * 0.1, eyeX + size * 0.15, eyeY + size * 0.1);
-            line(eyeX + size * 0.15, eyeY - size * 0.1, eyeX - size * 0.15, eyeY + size * 0.1);
-        } else {
-            // Normal eyes
-            fill(255, 230, 0);
-            noStroke();
-            ellipse(eyeX, -eyeY, size * 0.35, size * 0.2);
-            ellipse(eyeX, eyeY, size * 0.35, size * 0.2);
-
-            fill(0);
-            ellipse(eyeX + size * 0.05, -eyeY, size * 0.1, size * 0.15);
-            ellipse(eyeX + size * 0.05, eyeY, size * 0.1, size * 0.15);
-        }
+        fill(0);
+        ellipse(eyeX + size * 0.05, -eyeY, size * 0.1, size * 0.15);
+        ellipse(eyeX + size * 0.05, eyeY, size * 0.1, size * 0.15);
     }
 
     drawTailTip(size) {
@@ -867,10 +765,7 @@ class FlameSerpent {
     checkCollision(playerSnake) {
         if (!playerSnake || playerSnake.segments.length === 0) return null;
         const playerHead = playerSnake.segments[0].position;
-        if (this.isStunned) return null; // Completely safe when stunned
-
         for (let i = 0; i < this.segments.length; i++) {
-
             const bossSeg = this.segments[i].position;
             const dx = playerHead.x - bossSeg.x;
             const dy = playerHead.y - bossSeg.y;
@@ -903,7 +798,40 @@ class FlameSerpent {
             }
         }
 
+        // Check falling rocks using new collision method
+        for (let rock of this.fallingRocks) {
+            if (rock.checkPlayerCollision(playerHead)) {
+                rock.alive = false;
+                return createVector(rock.x, rock.y);
+            }
+        }
         return null;
     }
 
+    // Check if launched rocks hit the boss
+    checkRockDamage() {
+        let bossHead = this.segments[0].position;
+        let totalDamage = 0;
+
+        for (let rock of this.fallingRocks) {
+            let damage = rock.checkBossCollision(bossHead);
+            if (damage > 0) {
+                totalDamage += damage;
+                // Visual feedback
+                if (typeof screenShake !== 'undefined') screenShake = 5;
+            }
+        }
+
+        return totalDamage;
+    }
+
+    // Get all landed rocks near the player for dash interaction
+    getLandedRocksNearPlayer(playerHead) {
+        return this.fallingRocks.filter(rock => rock.isNearPlayer(playerHead));
+    }
+
+    // Clear all landed rocks (called when boss takes damage or new dash starts)
+    clearLandedRocks() {
+        this.fallingRocks = this.fallingRocks.filter(rock => rock.state !== 'landed');
+    }
 }

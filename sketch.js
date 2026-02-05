@@ -74,6 +74,9 @@ const levelProgression = {
     ],
     test2: [
         { level: 1, name: 'Test Arena 2', targetScore: 10, timeLimit: 0, isTutorial: false, description: 'Manual hunt mode' }
+    ],
+    test_stun: [
+        { level: 1, name: 'Stun Test', targetScore: 9999, timeLimit: 0, isTutorial: false, description: 'Practice Headbutt', bossId: 'flame-serpent' }
     ]
 };
 
@@ -156,6 +159,14 @@ function setup() {
         currentDifficultyLevel = 'test';
         currentLevel = 1;
         currentBoss = null; // Reset boss state
+        startGame();
+    });
+
+    const testStunBtn = document.getElementById('test-arena-3-btn');
+    if (testStunBtn) testStunBtn.addEventListener('click', () => {
+        currentDifficultyLevel = 'test_stun';
+        currentLevel = 1;
+        currentBoss = 'flame-serpent'; // Force boss spawn
         startGame();
     });
 
@@ -281,8 +292,12 @@ function resetGame() {
         const bossId = typeof currentBoss === 'string' ? currentBoss : currentBoss.bossId;
 
         if (bossId === 'flame-serpent') {
-            // Position boss off-screen top (descent)
-            bossEntity = new FlameSerpent(width * 0.8, -500);
+            if (currentDifficultyLevel === 'test_stun') {
+                bossEntity = new FlameSerpent(width * 0.5, height * 0.5);
+                bossEntity.setCoiledLayout(width * 0.5, height * 0.5, true);
+            } else {
+                bossEntity = new FlameSerpent(width * 0.8, -500);
+            }
             if (batFlock) batFlock.triggerPulse();
         }
 
@@ -795,6 +810,31 @@ function updateGame() {
 
         if (bossEntity) {
             bossEntity.update(obstacles, snake.segments[0].position);
+
+            // Check for headbutt damage
+            if (snake.checkHeadbuttDamage(bossEntity)) {
+                bossEntity.health -= 1;
+                console.log(`Boss headbutted! Damage: 1, Health: ${bossEntity.health}/${bossEntity.maxHealth}`);
+
+                // Visual feedback
+                particles.burst(bossEntity.segments[0].position.x, bossEntity.segments[0].position.y, color(251, 191, 36), 30);
+
+                if (typeof screenShake !== 'undefined') screenShake = 8;
+
+                if (bossEntity.health <= 0) {
+                    bossEntity.setState(BossState.DYING);
+                }
+            }
+
+            // Check for death completion (after animation)
+            if (bossEntity.currentState === BossState.DYING && bossEntity.isDead) {
+                // Ensure victory score
+                const levelData = getCurrentLevelData();
+                if (levelData && levelData.bossId) {
+                    score = max(score, levelData.targetScore);
+                }
+                triggerGameOver();
+            }
 
             // --- BOSS STATE LOGIC ---
             // Simple logic for state transitions for now
