@@ -1,0 +1,324 @@
+:root {
+    --primary-yellow: #fbbf24;
+    --primary-cyan: #22d3ee;
+    --navy-dark: #0f172a;
+    --navy-mid: #1e293b;
+    --glass: rgba(15, 23, 42, 0.7);
+    --font-main: 'Outfit', sans-serif;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--navy-dark);
+    font-family: var(--font-main);
+}
+
+canvas {
+    display: block;
+}
+
+/* Common Overlay Style */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    background-color: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(8px);
+    transition: opacity 0.5s ease;
+}
+
+.hidden {
+    display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Main Menu */
+.menu-content {
+    text-align: center;
+    color: white;
+}
+
+.logo-container {
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+.game-title {
+    font-size: 5rem;
+    font-weight: 900;
+    line-height: 0.8;
+    margin-top: -1rem;
+    letter-spacing: -0.05em;
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.game-title span {
+    color: #4ade80;
+    font-size: 4rem;
+}
+
+.stats-preview {
+    margin-bottom: 2rem;
+}
+
+.stat-box {
+    background: var(--glass);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.5rem 1.5rem;
+    border-radius: 1rem;
+    display: inline-block;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--primary-cyan);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 900;
+}
+
+.difficulty-selector {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+.diff-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    padding: 0.5rem 1rem;
+    border-radius: 0.75rem;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.diff-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.diff-btn.active {
+    background: var(--primary-cyan);
+    color: var(--navy-dark);
+    border-color: var(--primary-cyan);
+    box-shadow: 0 0 15px rgba(34, 211, 238, 0.4);
+}
+
+.primary-btn {
+    background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    border: none;
+    border-bottom: 6px solid #b45309;
+    padding: 1rem 4rem;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: white;
+    border-radius: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.primary-btn:active {
+    transform: translateY(4px);
+    border-bottom-width: 2px;
+}
+
+/* Top Bar */
+#game-ui {
+    position: fixed;
+    top: 1rem;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    z-index: 50;
+    pointer-events: none;
+}
+
+.ui-bar {
+    display: flex;
+    gap: 1rem;
+    background: var(--glass);
+    padding: 0.5rem 1rem;
+    border-radius: 100px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ui-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: white;
+    font-weight: 900;
+    font-size: 1.25rem;
+}
+
+.ui-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.ui-label {
+    font-size: 0.6rem;
+    color: var(--primary-cyan);
+    display: block;
+    margin-bottom: -4px;
+}
+
+.timer-container {
+    padding-left: 1rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    flex-direction: column;
+    align-items: flex-start !important;
+}
+
+#game-timer {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: var(--primary-yellow);
+}
+
+/* Game Over Modal */
+.king-modal {
+    background: linear-gradient(180deg, #1e40af, #111827);
+    border: 4px solid #3b82f6;
+    border-radius: 2rem;
+    padding: 3rem;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+    position: relative;
+}
+
+.king-modal h2 {
+    font-size: 3rem;
+    margin: 0 0 2rem 0;
+    color: white;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.final-stats {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.final-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    color: #93c5fd;
+    font-weight: 700;
+}
+
+.final-stat:last-child {
+    margin-bottom: 0;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.modal-btn {
+    flex: 1;
+    border: none;
+    padding: 1rem;
+    border-radius: 1rem;
+    font-weight: 900;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: white;
+}
+
+.modal-btn.yellow {
+    background: #fbbf24;
+    border-bottom: 4px solid #b45309;
+}
+
+.modal-btn.cyan {
+    background: #22d3ee;
+    border-bottom: 4px solid #0891b2;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite ease-in-out;
+}
+
+.test-arena-launcher {
+    margin-top: 2.5rem;
+}
+
+.test-btn {
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    border: none;
+    border-bottom: 4px solid #5b21b6;
+    color: white;
+    padding: 0.8rem 2.5rem;
+    font-size: 1.5rem;
+    font-weight: 900;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+    margin: 5px;
+}
+
+.test-btn.portal {
+    background: linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%);
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+}
+
+.test-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(168, 85, 247, 0.6);
+    filter: brightness(1.1);
+}
+
+.test-btn.portal:hover {
+    box-shadow: 0 0 30px rgba(14, 165, 233, 0.6);
+}
+
+.test-btn:active {
+    transform: translateY(2px);
+    border-bottom-width: 0;
+}
