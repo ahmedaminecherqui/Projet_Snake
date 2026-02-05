@@ -88,11 +88,10 @@ class Snake extends Vehicle {
 
             if (this.dashCooldown > 0) this.dashCooldown--;
 
-            // Normal player-controlled behavior
+            // Normal player-controlled behavior - PURE MANUAL CONTROL
+            // No AI steering, player has full direct control
             let arriveForce = head.arrive(target, 100);
-            let avoidForce = head.avoid(obstacles);
             head.applyForce(arriveForce);
-            head.applyForce(avoidForce.mult(2.0));
         }
 
         // IMPORTANT: Calculate boundary steering force BEFORE update
@@ -147,16 +146,15 @@ class Snake extends Vehicle {
         if (this.isDashing && this.ghostHistory && this.ghostHistory.length > 0) {
             push();
             noStroke();
-            drawingContext.shadowBlur = 20;
-            drawingContext.shadowColor = color(74, 222, 128);
+            // REMOVED: drawingContext.shadowBlur = 20; (Performance Killer)
 
             for (let i = 0; i < this.ghostHistory.length; i++) {
                 let snapshot = this.ghostHistory[i];
-                let opacity = map(i, 0, this.ghostHistory.length, 50, 150);
+                let opacity = map(i, 0, this.ghostHistory.length, 30, 80); // Reduced opacity for cleaner look
                 fill(74, 222, 128, opacity); // Neon Green Ghost
 
                 for (let pos of snapshot) {
-                    ellipse(pos.x, pos.y, 20); // slightly smaller segments
+                    ellipse(pos.x, pos.y, 20);
                 }
             }
             pop();
@@ -202,14 +200,17 @@ class Snake extends Vehicle {
                     let len = baseLen * flicker;
 
                     push();
-                    drawingContext.shadowBlur = 30;
-                    drawingContext.shadowColor = color(255, 0, 0);
-                    stroke(255, 0, 0); // Extreme Red
-                    strokeWeight(5); // Ultra Thicker
+                    // --- OPTIMIZED TONGUE GLOW ---
+                    strokeWeight(12);
+                    stroke(255, 0, 0, 50); // Soft outer glow
+                    translate(0, -45);
+                    line(0, 0, 0, -len);
+
+                    strokeWeight(5); // Sharp core
+                    stroke(255, 0, 0);
                     strokeCap(ROUND);
                     noFill();
 
-                    translate(0, -45);
                     line(0, 0, 0, -len); // Central line
                     // Huge Forked tips (V)
                     line(0, -len, -10, -len - 10);

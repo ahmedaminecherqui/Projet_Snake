@@ -15,6 +15,7 @@ if (typeof Particle === 'undefined') {
             this.lifespan -= 10;
         }
         display() {
+            push();
             noStroke();
             if (this.c && this.c.levels) {
                 fill(this.c.levels[0], this.c.levels[1], this.c.levels[2], this.lifespan);
@@ -22,6 +23,7 @@ if (typeof Particle === 'undefined') {
                 fill(255, this.lifespan);
             }
             ellipse(this.pos.x, this.pos.y, 4, 4);
+            pop();
         }
         isDead() { return this.lifespan < 0; }
     }

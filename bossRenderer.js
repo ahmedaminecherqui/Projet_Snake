@@ -167,16 +167,22 @@ class BossRenderer {
         background(20, 10, 10);
         let pulse = (sin(frameCount * 0.05) + 1) * 0.5;
         let magmaColor = lerpColor(color(200, 50, 0), color(255, 150, 0), pulse);
-        drawingContext.shadowBlur = 30 + pulse * 20;
-        drawingContext.shadowColor = color(255, 100, 0);
-        fill(magmaColor);
+
+        // --- OPTIMIZED FISSURE GLOW (Fast pass instead of Native Shadow) ---
         noStroke();
+        fill(255, 100, 0, 40 + pulse * 20); // Fast glow pass
         for (let fissure of this.fissures) {
             beginShape();
             for (let p of fissure) vertex(p.x, p.y);
             endShape(CLOSE);
         }
-        drawingContext.shadowBlur = 0;
+
+        fill(magmaColor);
+        for (let fissure of this.fissures) {
+            beginShape();
+            for (let p of fissure) vertex(p.x, p.y);
+            endShape(CLOSE);
+        }
     }
 
     drawForeground() {

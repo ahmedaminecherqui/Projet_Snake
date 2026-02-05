@@ -11,13 +11,23 @@ class Obstacle {
         translate(this.position.x, this.position.y);
         rotate(this.rotation);
 
-        // Toxic Glow
-        drawingContext.shadowBlur = 20;
-        let c = color(220, 38, 38); 
-        drawingContext.shadowColor = c;
+        // --- OPTIMIZED OBSTACLE GLOW ---
+        let c = color(220, 38, 38);
+        noStroke();
+        fill(220, 38, 38, 40); // Soft outer glow pass
+        if (this.shapeType === 0) {
+            ellipse(0, 0, this.r * 2.5);
+        } else if (this.shapeType === 1) {
+            beginShape();
+            vertex(0, -this.r * 1.3);
+            vertex(this.r * 1.3, this.r * 1.0);
+            vertex(-this.r * 1.3, this.r * 1.0);
+            endShape(CLOSE);
+        } else {
+            ellipse(0, 0, this.r * 3.0, this.r * 1.8);
+        }
 
         fill(c);
-        noStroke();
 
         if (this.shapeType === 0) {
             ellipse(0, 0, this.r * 2);

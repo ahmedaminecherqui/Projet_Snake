@@ -95,8 +95,7 @@ class ToxicSnake {
                     this.segments[i]._lastHeading = angle;
                 }
                 rotate(angle);
-                drawingContext.shadowBlur = 15;
-                drawingContext.shadowColor = color(34, 197, 94);
+                // REMOVED expensive shadowBlur
                 fill(c);
                 noStroke();
                 // Draw triangle with BASE at pivot (0,0) so it doesn't disconnect when turning
@@ -126,14 +125,17 @@ class ToxicSnake {
                     let len = baseLen * flicker;
 
                     push();
-                    drawingContext.shadowBlur = 30;
-                    drawingContext.shadowColor = color(168, 85, 247);
-                    stroke(168, 85, 247); // Extreme Purple
-                    strokeWeight(5); // Ultra Thicker
+                    // --- OPTIMIZED PURPLE TONGUE GLOW ---
+                    strokeWeight(12);
+                    stroke(168, 85, 247, 50); // Soft outer glow
+                    translate(0, -25);
+                    line(0, 0, 0, -len);
+
+                    strokeWeight(5); // Sharp core
+                    stroke(168, 85, 247);
                     strokeCap(ROUND);
                     noFill();
 
-                    translate(0, -25); // Tip of sharp head
                     line(0, 0, 0, -len); // Central line
                     // Huge Forked tips (V)
                     line(0, -len, -10, -len - 10);

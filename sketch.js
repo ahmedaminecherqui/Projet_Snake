@@ -571,8 +571,7 @@ function updateMainMenu() {
         menuSnake.update(head.position.copy().add(head.velocity.copy().mult(10)), []);
 
         push();
-        drawingContext.shadowBlur = 30;
-        drawingContext.shadowColor = color(74, 222, 128);
+        // REMOVED shadowBlur for menu snake
         menuSnake.display(mascotImg);
         pop();
     }
@@ -601,8 +600,7 @@ function updateGame() {
     }
 
     push();
-    drawingContext.shadowBlur = 15;
-    drawingContext.shadowColor = color(251, 191, 36, 150);
+    // REMOVED shadowBlur for player snake
     let head = snake.segments[0];
     if (head) {
         snake.display(mascotImg);
