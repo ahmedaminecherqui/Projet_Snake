@@ -181,6 +181,7 @@ function backToMenu() {
     document.getElementById('game-over-modal').classList.add('hidden');
     document.getElementById('pause-menu').classList.add('hidden');
     document.getElementById('settings-menu').classList.add('hidden');
+    document.getElementById('skip-container')?.classList.add('hidden');
     document.getElementById('main-menu').classList.remove('hidden');
 
     // Refresh UI & Level Selection
@@ -453,6 +454,14 @@ function setup() {
         });
     }
 
+    const skipBtn = document.getElementById('skip-cutscene-btn');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', () => {
+            cinematicTimer = 600; // Skip to the end of the cutscene
+            document.getElementById('skip-container')?.classList.add('hidden');
+        });
+    }
+
     document.querySelectorAll('.key-bind-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             // Cancel any existing rebinding
@@ -488,6 +497,7 @@ function resetGame() {
 
     const gameOverModal = document.getElementById('game-over-modal');
     if (gameOverModal) gameOverModal.classList.add('hidden');
+    document.getElementById('skip-container')?.classList.add('hidden');
 
     lives = 3;
     invulnerableTimer = 0;
@@ -1143,6 +1153,12 @@ function showHUD() {
 function updateBossIntro() {
     cinematicTimer++;
 
+    // Show skip button if hidden
+    const skipContainer = document.getElementById('skip-container');
+    if (skipContainer && skipContainer.classList.contains('hidden')) {
+        skipContainer.classList.remove('hidden');
+    }
+
     // 1. PLAYER ENTRY (0-100)
     if (cinematicTimer < 100) {
         let entryTarget = createVector(width / 4, height / 2);
@@ -1210,12 +1226,30 @@ function updateBossIntro() {
     }
     // START FIGHT
     else {
-        // For now, let's keep it in TRACKING for a bit or start WANDERING
-        // User said: "after that the serpent's body still does not moves and his head still just follows in place"
-        // So we stay in TRACKING state initially
         gameState = PLAYING;
         gameStartTime = millis();
         screenShake = 0;
+
+        if (bossEntity) {
+            // Start with TRACKING (static body, head aims at player, leads to fireballs)
+            bossEntity.setState(BossState.TRACKING);
+
+            // If we skipped early (during entry or descent), snap to center
+            if (cinematicTimer < 605) { // Check if we just jumped here via skip or reached naturally
+                // Only snap if we skipped significantly early
+                if (cinematicTimer < 450) {
+                    let center = createVector(width / 2, height / 2);
+                    bossEntity.segments[0].position.set(center);
+                    // Also reset segments to follow roughly
+                    for (let i = 1; i < bossEntity.segments.length; i++) {
+                        bossEntity.segments[i].position.set(center);
+                    }
+                }
+            }
+        }
+
+        // Hide skip button
+        document.getElementById('skip-container')?.classList.add('hidden');
 
         // Start Boss Music Loop
         if (bossMusic && !bossMusic.isPlaying()) {
