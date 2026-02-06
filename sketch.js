@@ -15,6 +15,10 @@ let lives = 3;
 let invulnerableTimer = 0;
 let batFlock; // Foreground bat flock system
 
+// Audio State
+let musicVolume = parseFloat(localStorage.getItem('kingSnakeMusicVolume')) || 0.5;
+let sfxVolume = parseFloat(localStorage.getItem('kingSnakeSfxVolume')) || 0.7;
+
 // Assets
 let mascotImg;
 let backgroundImg;
@@ -46,7 +50,7 @@ let completionStartTime = 0;
 let showCompleteMenuTime = 1000; // 1 second delay
 
 // Difficulty Settings Level
-let currentDifficulty = 'moderate';
+let currentDifficultyLevel = 'easy';
 const difficultySettings = {
     easy: { obstacles: 3, enemies: 1, pursuit: 0.30, food: 5 },
     moderate: { obstacles: 6, enemies: 3, pursuit: 0.45, food: 7 },
@@ -58,7 +62,7 @@ const difficultySettings = {
 
 // Level Progression System
 let currentLevel = 1;
-let currentDifficultyLevel = 'easy';
+// currentDifficultyLevel is defined above
 const levelProgression = {
     easy: [
         { level: 1, name: 'Tutorial', targetScore: 5, timeLimit: 90, isTutorial: true, description: 'Learn the basics' },
@@ -100,10 +104,9 @@ function initLevelProgress() {
         levelProgress = JSON.parse(saved);
     } else {
         levelProgress = {
-            easy: { completed: [false, false, false], unlockedDifficulty: 'easy' },
-            moderate: { completed: [false, false, false], unlockedDifficulty: false },
-            hard: { completed: [false, false, false], unlockedDifficulty: false },
-            expert: { completed: [false, false, false], unlockedDifficulty: false }
+            easy: { completed: [false, false, false] },
+            moderate: { completed: [false, false, false] },
+            hard: { completed: [false, false, false] }
         };
         saveLevelProgress();
     }
@@ -117,23 +120,79 @@ function getCurrentLevelData() {
     return levelProgression[currentDifficultyLevel][currentLevel - 1];
 }
 
-function isLevelUnlocked(difficulty) {
-    return levelProgress[difficulty] && levelProgress[difficulty].unlockedDifficulty;
+function isLevelUnlocked(difficulty, levelIdx) {
+    if (difficulty === 'easy' && levelIdx === 0) return true;
+
+    if (levelIdx > 0) {
+        // Unlock Level N if Level N-1 is completed
+        return levelProgress[difficulty] && levelProgress[difficulty].completed[levelIdx - 1];
+    } else {
+        // First level of a difficulty
+        const difficulties = ['easy', 'moderate', 'hard'];
+        const currentIdx = difficulties.indexOf(difficulty);
+        if (currentIdx > 0) {
+            const prevDifficulty = difficulties[currentIdx - 1];
+            // Unlock first level of Moderate/Hard if previous difficulty is fully completed
+            return levelProgress[prevDifficulty] && levelProgress[prevDifficulty].completed.every(c => c);
+        }
+    }
+    return false;
 }
 
 function completeLevel(difficulty, levelNum) {
     if (!levelProgress[difficulty]) levelProgress[difficulty] = { completed: [false, false, false] };
     levelProgress[difficulty].completed[levelNum - 1] = true;
-
-    // Check if all levels in this difficulty are complete, unlock next
-    if (levelProgress[difficulty].completed.every(c => c)) {
-        const difficulties = ['easy', 'moderate', 'hard', 'expert'];
-        const currentIdx = difficulties.indexOf(difficulty);
-        if (currentIdx < difficulties.length - 1) {
-            levelProgress[difficulties[currentIdx + 1]].unlockedDifficulty = true;
-        }
-    }
     saveLevelProgress();
+
+    // Refresh UI immediately to show next unlocked level
+    setupLevelSelection();
+}
+
+function backToMenu() {
+    // Reset Game State
+    gameState = START;
+    currentBoss = null;
+    currentLevel = 1;
+    currentDifficultyLevel = 'easy'; // Reset difficulty hub
+    score = 0;
+    lives = 3;
+
+    // Stop all audio
+    if (bossMusic) bossMusic.stop();
+    if (menuMusic) menuMusic.stop();
+
+    // Reset UI
+    document.getElementById('game-ui').classList.add('hidden');
+    document.getElementById('game-over-modal').classList.add('hidden');
+    document.getElementById('pause-menu').classList.add('hidden');
+    document.getElementById('settings-menu').classList.add('hidden');
+    document.getElementById('main-menu').classList.remove('hidden');
+
+    // Refresh UI & Level Selection
+    updateUI();
+    setupLevelSelection();
+
+    // Ensure game loop is running for menu animation
+    loop();
+}
+
+/**
+ * Resets all level progression and top scores
+ */
+function resetLevelProgress() {
+    if (confirm("⚠️ WARNING: This will delete ALL your progress and top scores. Are you sure?")) {
+        localStorage.removeItem('kingSnakeLevelProgress');
+        localStorage.removeItem('kingSnakeTopScore');
+
+        // Re-initialize logic
+        topScore = 0;
+        initLevelProgress();
+
+        // Return to main hub
+        backToMenu();
+
+        console.log("Progress wiped successfully.");
+    }
 }
 
 // Timer Variables
@@ -154,9 +213,35 @@ function preload() {
     hurtSound = loadSound('assets/38. Hurt.mp3');
     dieSound = loadSound('assets/91. Die.mp3');
     menuMusic = loadSound('assets/boss_menu_theme.mp3',
-        () => console.log("Menu Music Loaded Successfully"),
+        () => {
+            console.log("Menu Music Loaded Successfully");
+            applyInitialVolumes();
+        },
         (err) => console.error("Menu Music Failed to Load", err)
     );
+}
+
+function applyInitialVolumes() {
+    updateVolumes();
+
+    // Set slider initial values
+    const musicSlider = document.getElementById('music-volume');
+    const sfxSlider = document.getElementById('sfx-volume');
+    if (musicSlider) musicSlider.value = musicVolume;
+    if (sfxSlider) sfxSlider.value = sfxVolume;
+}
+
+function updateVolumes() {
+    // Music
+    if (bossMusic) bossMusic.setVolume(musicVolume);
+    if (menuMusic) menuMusic.setVolume(musicVolume);
+
+    // SFX
+    if (bossHitSound) bossHitSound.setVolume(sfxVolume);
+    if (explodeSound) explodeSound.setVolume(sfxVolume);
+    if (fireShotSound) fireShotSound.setVolume(sfxVolume);
+    if (hurtSound) hurtSound.setVolume(sfxVolume);
+    if (dieSound) dieSound.setVolume(sfxVolume);
 }
 
 function setup() {
@@ -173,9 +258,48 @@ function setup() {
     if (restartBtn) restartBtn.addEventListener('click', resetGame);
 
     const exitBtn = document.getElementById('exit-btn');
-    if (exitBtn) exitBtn.addEventListener('click', () => {
-        location.reload();
-    });
+    if (exitBtn) exitBtn.addEventListener('click', backToMenu);
+
+    const resetBtn = document.getElementById('reset-progress-btn');
+    if (resetBtn) resetBtn.addEventListener('click', resetLevelProgress);
+
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsMenu = document.getElementById('settings-menu');
+    const settingsBackBtn = document.getElementById('settings-back-btn');
+
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            document.getElementById('main-menu').classList.add('hidden');
+            settingsMenu.classList.remove('hidden');
+        });
+    }
+
+    if (settingsBackBtn) {
+        settingsBackBtn.addEventListener('click', () => {
+            settingsMenu.classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        });
+    }
+
+    // Audio Sliders
+    const musicSlider = document.getElementById('music-volume');
+    const sfxSlider = document.getElementById('sfx-volume');
+
+    if (musicSlider) {
+        musicSlider.addEventListener('input', (e) => {
+            musicVolume = parseFloat(e.target.value);
+            localStorage.setItem('kingSnakeMusicVolume', musicVolume);
+            updateVolumes();
+        });
+    }
+
+    if (sfxSlider) {
+        sfxSlider.addEventListener('input', (e) => {
+            sfxVolume = parseFloat(e.target.value);
+            localStorage.setItem('kingSnakeSfxVolume', sfxVolume);
+            updateVolumes();
+        });
+    }
 
     const testBtn = document.getElementById('test-arena-btn');
     if (testBtn) testBtn.addEventListener('click', () => {
@@ -189,7 +313,15 @@ function setup() {
     if (testStunBtn) testStunBtn.addEventListener('click', () => {
         currentDifficultyLevel = 'test_stun';
         currentLevel = 1;
-        currentBoss = 'flame-serpent'; // Force boss spawn
+        currentBoss = 'flame-serpent';
+        startGame();
+    });
+
+    const testArena2Btn = document.getElementById('test-arena-2-btn');
+    if (testArena2Btn) testArena2Btn.addEventListener('click', () => {
+        currentDifficultyLevel = 'test2';
+        currentLevel = 1;
+        currentBoss = null;
         startGame();
     });
 
@@ -200,23 +332,19 @@ function setup() {
     const mainMenu = document.getElementById('main-menu');
     const bossBackBtn = document.getElementById('boss-back-btn');
 
-    if (bossArenaBtn) bossArenaBtn.addEventListener('click', () => {
-        userStartAudio(); // Ensure audio context is ready
-        mainMenu.classList.add('hidden');
-        bossMenu.classList.remove('hidden');
+    if (bossArenaBtn) {
+        bossArenaBtn.addEventListener('click', () => {
+            userStartAudio(); // Ensure audio context is ready
+            mainMenu.classList.add('hidden');
+            bossMenu.classList.remove('hidden');
 
-        // Loop Nuclear Flash from 1:21 (81s)
-        // Loop Nuclear Flash from 1:21 (81s)
-        if (menuMusic) {
-            console.log("Starting Boss Menu Music at 81s...");
-            if (!menuMusic.isPlaying()) {
+            // Loop Menu Music (formerly Nuclear Flash) from 1:21 (81s)
+            if (menuMusic && !menuMusic.isPlaying()) {
                 menuMusic.jump(81);
                 menuMusic.loop(0, 1, 1, 81);
             }
-        } else {
-            console.error("Menu music not loaded!");
-        }
-    });
+        });
+    }
 
     if (bossBackBtn) bossBackBtn.addEventListener('click', () => {
         bossMenu.classList.add('hidden');
@@ -255,6 +383,12 @@ function setup() {
     // Initialize Boss Renderer
     bossRenderer = new BossRenderer();
 
+    // Initialize Boss Arena Cards
+    setupBossArena();
+
+    // Level selection and other UI
+    setupLevelSelection();
+
     // Pause Menu Event Listeners
     const pauseMenu = document.getElementById('pause-menu');
     const resumeBtn = document.getElementById('resume-btn');
@@ -272,10 +406,7 @@ function setup() {
 
     if (pauseExitBtn) pauseExitBtn.addEventListener('click', () => {
         resumeGame();
-        gameState = START;
-        currentBoss = null;
-        document.getElementById('game-ui').classList.add('hidden');
-        document.getElementById('main-menu').classList.remove('hidden');
+        backToMenu();
     });
 
     // ESC Key Handler for Pause
@@ -293,6 +424,7 @@ function setup() {
 }
 
 function startGame() {
+    console.log("Starting Game:", currentDifficultyLevel, "Level:", currentLevel);
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
     resetGame();
@@ -383,8 +515,8 @@ function initFoods() {
     foods = [];
     if (currentBoss) return; // NO FOOD IN BOSS BATTLES
 
-    const settings = difficultySettings[currentDifficultyLevel];
-    const foodCount = settings ? settings.food : 5;
+    const settings = difficultySettings[currentDifficultyLevel] || difficultySettings['easy'];
+    const foodCount = settings.food;
     for (let i = 0; i < foodCount; i++) {
         foods.push(new Food());
     }
@@ -660,6 +792,10 @@ function updateCompleting() {
         let v = allVehicles[i];
         let target = formationTargets[i];
 
+        // Boost physics for the celebration
+        v.maxSpeed = 15;
+        v.maxForce = 0.8;
+
         let dx = v.position.x - target.x;
         let dy = v.position.y - target.y;
         let d = sqrt(dx * dx + dy * dy);
@@ -689,8 +825,8 @@ function updateCompleting() {
         particles.display();
     }
 
-    // Delay 3 seconds before showing the Level Complete menu
-    if (millis() - completionStartTime > 3000) {
+    // Delay 4 seconds before showing the Level Complete menu
+    if (millis() - completionStartTime > 4000) {
         if (currentDifficultyLevel === 'test2') {
             // No menu for test2, just stay in formation
             return;
@@ -1099,39 +1235,47 @@ function triggerGameOver() {
 }
 
 function actualTriggerGameOver() {
-    gameState = GAMEOVER;
+    const levelData = getCurrentLevelData();
+    let levelWon = score >= levelData.targetScore;
+
+    // Record top score if applicable
     if (score > topScore) {
         topScore = score;
         localStorage.setItem('kingSnakeTopScore', topScore);
     }
 
-    const levelData = getCurrentLevelData();
-    let levelCompleted = score >= levelData.targetScore;
-
-    if (levelCompleted && currentDifficultyLevel !== 'test') {
+    // Progression hub ONLY (Easy/Moderate/Hard)
+    const hubDifficulties = ['easy', 'moderate', 'hard'];
+    if (levelWon && hubDifficulties.includes(currentDifficultyLevel) && gameState !== GAMEOVER) {
         completeLevel(currentDifficultyLevel, currentLevel);
     }
+
+    // Stop boss music as soon as game ends
+    if (bossMusic) bossMusic.stop();
+
+    gameState = GAMEOVER;
 
     document.getElementById('final-score').innerText = score;
     document.getElementById('final-top-score').innerText = topScore;
 
     const gameOverModal = document.getElementById('game-over-modal');
+    const modalTitle = document.getElementById('modal-title');
     gameOverModal.classList.remove('hidden');
 
-    if (levelCompleted) {
+    if (levelWon) {
+        if (modalTitle) modalTitle.innerText = "LEVEL COMPLETE";
         document.getElementById('level-complete-msg').style.display = 'block';
         const nextBtn = document.getElementById('next-level-btn');
         if (nextBtn) nextBtn.style.display = 'block';
     } else {
+        if (modalTitle) modalTitle.innerText = "GAME OVER";
         document.getElementById('level-complete-msg').style.display = 'none';
         const nextBtn = document.getElementById('next-level-btn');
         if (nextBtn) nextBtn.style.display = 'none';
     }
 
-    // If test mode, don't actually end the game modal-wise if needed, 
-    // but here we let it show to allow restart.
+    // If test mode, allow restart but essentially sandbox
     if (currentDifficultyLevel === 'test') {
-        // Just show a message or do nothing, keeping sandbox active
         return;
     }
 
@@ -1323,7 +1467,7 @@ class Particle {
 }
 // Level selection setup
 function setupLevelSelection() {
-    const difficulties = ['easy', 'moderate', 'hard', 'expert'];
+    const difficulties = ['easy', 'moderate', 'hard'];
     difficulties.forEach(difficulty => {
         const levelData = levelProgression[difficulty];
         levelData.forEach((level, idx) => {
@@ -1336,15 +1480,6 @@ function setupLevelSelection() {
                 btn.id = btnId;
                 btn.className = 'level-btn';
                 btn.innerHTML = `<div class="level-number">${level.level}</div><div class="level-name">${level.name}</div>`;
-
-                btn.addEventListener('click', () => {
-                    if (!btn.classList.contains('locked')) {
-                        currentDifficultyLevel = difficulty;
-                        currentLevel = level.level;
-                        startGame();
-                    }
-                });
-
                 const container = document.getElementById(`levels-${difficulty}`);
                 if (container) {
                     container.appendChild(btn);
@@ -1352,7 +1487,7 @@ function setupLevelSelection() {
             }
 
             // Update button state (locked/completed/unlocked)
-            const isUnlocked = difficulty === 'easy' || (levelProgress[difficulty] && levelProgress[difficulty].unlockedDifficulty);
+            const isUnlocked = isLevelUnlocked(difficulty, idx);
             const isCompleted = levelProgress[difficulty] && levelProgress[difficulty].completed[idx];
 
             btn.classList.remove('locked', 'completed');
@@ -1366,47 +1501,28 @@ function setupLevelSelection() {
                 btn.disabled = false;
             }
 
-            // Ensure boss mode is set correctly when clicking levels
+            // Clear old listeners by overwriting onclick
             btn.onclick = () => {
                 if (!btn.classList.contains('locked')) {
                     currentDifficultyLevel = difficulty;
                     currentLevel = level.level;
                     // If level has a bossId, it is a boss level
-                    currentBoss = level.bossId ? level : null;
+                    currentBoss = (level.bossId) ? level : null;
                     startGame();
                 }
             };
         });
     });
+}
 
-    const testArenaBtn = document.getElementById('test-arena-btn');
-    if (testArenaBtn) {
-        testArenaBtn.onclick = () => {
-            currentDifficultyLevel = 'test';
-            currentLevel = 1;
-            document.getElementById('main-menu').classList.add('hidden');
-            document.getElementById('game-ui').classList.remove('hidden');
-            startGame();
-        };
-    }
-
-    const testArena2Btn = document.getElementById('test-arena-2-btn');
-    if (testArena2Btn) {
-        testArena2Btn.onclick = () => {
-            currentDifficultyLevel = 'test2';
-            currentLevel = 1;
-            document.getElementById('main-menu').classList.add('hidden');
-            document.getElementById('game-ui').classList.remove('hidden');
-            startGame();
-        };
-    }
-
-    // Handle Expert Boss Cards (Hardcoded in HTML)
+/**
+     * Handle Expert Boss Selection from the Boss Arena
+     */
+function setupBossArena() {
     document.querySelectorAll('.boss-card').forEach(card => {
         card.onclick = () => {
             const bossId = card.getAttribute('data-boss');
             currentDifficultyLevel = 'expert';
-            // Find level index based on bossId
             const levelIdx = levelProgression.expert.findIndex(l => l.bossId === bossId);
             if (levelIdx !== -1) {
                 currentLevel = levelIdx + 1;
@@ -1542,15 +1658,16 @@ function drawTestArenaInstructions() {
     pop();
 }
 
-// Add next level button handler
+// DOM Initialization
 document.addEventListener('DOMContentLoaded', () => {
     // initialize level buttons once DOM is ready
     setupLevelSelection();
+    setupBossArena(); // Connect boss arena functionality
+
     const nextLevelBtn = document.getElementById('next-level-btn');
     if (nextLevelBtn) {
         nextLevelBtn.addEventListener('click', () => {
-            // Move to next level or difficulty
-            const difficulties = ['easy', 'moderate', 'hard', 'expert'];
+            const difficulties = ['easy', 'moderate', 'hard'];
             const currentIdx = difficulties.indexOf(currentDifficultyLevel);
 
             if (currentLevel < 3) {
@@ -1558,21 +1675,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (currentIdx < difficulties.length - 1) {
                 currentDifficultyLevel = difficulties[currentIdx + 1];
                 currentLevel = 1;
-            } else {
-                // All levels complete!
-                location.reload();
-                return;
             }
 
-            document.getElementById('game-over-modal').classList.add('hidden');
-            document.getElementById('game-ui').classList.add('hidden');
-            document.getElementById('main-menu').classList.remove('hidden');
-
-            // Refresh level button states to show newly unlocked levels
-            setupLevelSelection();
-
-            gameState = START;
-            loop();
+            backToMenu();
         });
     }
 });

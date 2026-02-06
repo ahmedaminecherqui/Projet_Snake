@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>King Snake Royale</title>
-    <link rel="stylesheet" href="style.css?v=20260205">
+    <link rel="stylesheet" href="style.css?v=20260206_v8">
     <link rel="stylesheet" href="levels.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
@@ -49,16 +49,44 @@
                     <h3 class="difficulty-title">HARD</h3>
                     <div id="levels-hard" class="levels-container"></div>
                 </div>
-                <div class="difficulty-group locked-group">
-                    <h3 class="difficulty-title">EXPERT</h3>
-                    <div id="levels-expert" class="levels-container"></div>
-                </div>
             </div>
             <div class="test-arena-launcher">
                 <button id="test-arena-btn" class="menu-btn test-btn">TEST ARENA 🧪</button>
                 <button id="test-arena-2-btn" class="menu-btn test-btn portal">TEST ARENA 2 🌀</button>
                 <button id="test-arena-3-btn" class="menu-btn test-btn stun">TEST STUN 😵</button>
                 <button id="boss-arena-btn" class="menu-btn test-btn boss">BOSS ARENA 💀</button>
+                <button id="settings-btn" class="menu-btn test-btn settings" title="Settings">SETTINGS ⚙️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Menu -->
+    <div id="settings-menu" class="overlay hidden">
+        <div class="menu-content settings-content">
+            <h1 class="settings-title">SETTINGS</h1>
+
+            <div class="settings-group">
+                <h3>AUDIO</h3>
+                <div class="setting-item">
+                    <label for="music-volume">Music Volume:</label>
+                    <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.5">
+                </div>
+                <div class="setting-item">
+                    <label for="sfx-volume">SFX Volume:</label>
+                    <input type="range" id="sfx-volume" min="0" max="1" step="0.01" value="0.7">
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>DATA</h3>
+                <p class="section-desc" style="opacity: 0.6; font-size: 0.8rem; margin-bottom: 1rem;">Permanently wipe
+                    all your progress and scores.</p>
+                <button id="reset-progress-btn" class="menu-btn red delete-btn"
+                    style="width: 100%; border-radius: 0.8rem;">RESET ALL PROGRESS ⚠️</button>
+            </div>
+
+            <div class="settings-actions">
+                <button id="settings-back-btn" class="menu-btn test-btn back pulse-low">BACK TO MENU ⬅️</button>
             </div>
         </div>
     </div>
@@ -110,7 +138,7 @@
             <div class="pause-actions">
                 <button id="resume-btn" class="modal-btn yellow">▶️ Resume</button>
                 <button id="pause-restart-btn" class="modal-btn cyan">🔄 Restart</button>
-                <button id="pause-exit-btn" class="modal-btn red">🚪 Exit to Menu</button>
+                <button id="pause-exit-btn" class="modal-btn red">🚪 Back to Menu</button>
             </div>
             <div class="pause-hint">Press ESC to resume</div>
         </div>
@@ -143,7 +171,7 @@
     <!-- Game Over Modal -->
     <div id="game-over-modal" class="overlay hidden">
         <div class="modal-content king-modal">
-            <h2>Game Over</h2>
+            <h2 id="modal-title">Game Over</h2>
             <div id="level-complete-msg"
                 style="display: none; color: #4ade80; font-size: 20px; font-weight: bold; margin: 10px 0;">🎉 LEVEL
                 COMPLETE!</div>
@@ -160,7 +188,7 @@
             <div class="modal-actions">
                 <button id="next-level-btn" class="modal-btn yellow" style="display: none;">Next Level</button>
                 <button id="restart-btn" class="modal-btn yellow">Play Again</button>
-                <button id="exit-btn" class="modal-btn cyan">Exit Game</button>
+                <button id="exit-btn" class="modal-btn cyan">Back to Menu</button>
             </div>
         </div>
     </div>
