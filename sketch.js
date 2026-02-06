@@ -40,6 +40,7 @@ let gameState = START;
 
 let cinematicTimer = 0;
 let screenShake = 0; // Current intensity
+let introDialogue = null; // Decoupled rendering
 
 let completionStartTime = 0;
 let showCompleteMenuTime = 1000; // 1 second delay
@@ -482,7 +483,8 @@ function draw() {
     }
 
     // 5. LAYER: ABSOLUTE FOREGROUND
-    if (batFlock) {
+    const bossIdForBats = currentBoss?.bossId || (typeof currentBoss === 'string' ? currentBoss : null);
+    if (batFlock && bossIdForBats === 'flame-serpent') {
         batFlock.update();
         batFlock.display();
     }
@@ -491,8 +493,22 @@ function draw() {
     if (currentBoss && bossEntity && (gameState === PLAYING || gameState === BOSS_INTRO)) {
         drawBossHealthBar();
     }
+
+    // 6. LAYER: ABSOLUTE OVERLAY (Dialogue)
+    if (introDialogue) {
+        drawIntroText(
+            introDialogue.text,
+            introDialogue.col,
+            introDialogue.shake,
+            introDialogue.age,
+            introDialogue.speed
+        );
+        introDialogue = null; // Clear for next frame
+    }
+
     pop();
 }
+
 
 let formationTargets = [];
 
@@ -917,9 +933,13 @@ function updateBossIntro() {
         snake.update(entryTarget, [], [], []);
         hideHUD();
     }
+    // Display First (Z-Index Fix)
+    if (snake) snake.display(mascotImg);
+    if (bossEntity) bossEntity.display();
+
     // 2. BOSS DESCENT (100-240)
     // Boss comes down naturally. NO COILING.
-    else if (cinematicTimer < 240) {
+    if (cinematicTimer >= 100 && cinematicTimer < 240) {
         hideHUD();
         snake.update(snake.segments[0].position.copy(), [], [], []);
         screenShake = map(cinematicTimer, 100, 240, 0, 10);
@@ -930,16 +950,47 @@ function updateBossIntro() {
             bossEntity.update([], bossTarget);
         }
     }
-    // 3. TRACKING (240-420)
-    // Body is static, only head tracks player
-    else if (cinematicTimer < 420) {
+    // 3. TEASE (240-450)
+    // Typewriter effect: "You disturb my slumber, little worm?"
+    else if (cinematicTimer < 450) {
         hideHUD();
         screenShake = 1;
+
         if (bossEntity) {
             bossEntity.setState(BossState.TRACKING);
             bossEntity.update([], snake.segments[0].position);
         }
         snake.update(snake.segments[0].position.copy(), [], [], []);
+
+        let textStart = 240;
+        introDialogue = {
+            text: "       You disturb my slumber...\n              little worm?",
+            col: color(255),
+            shake: false,
+            age: cinematicTimer - textStart,
+            speed: 2
+        };
+    }
+    // 4. THREAT (450-600)
+    // "NOW... BURN!"
+    else if (cinematicTimer < 600) {
+        hideHUD();
+        screenShake = 5;
+
+        if (bossEntity) {
+            bossEntity.setState(BossState.TRACKING);
+            bossEntity.update([], snake.segments[0].position);
+        }
+        snake.update(snake.segments[0].position.copy(), [], [], []);
+
+        let textStart = 450;
+        introDialogue = {
+            text: "NOW... BURN!",
+            col: color(255, 50, 50),
+            shake: true,
+            age: cinematicTimer - textStart,
+            speed: 5
+        };
     }
     // START FIGHT
     else {
@@ -955,10 +1006,6 @@ function updateBossIntro() {
             bossMusic.loop();
         }
     }
-
-    // Always display
-    if (snake) snake.display(mascotImg);
-    if (bossEntity) bossEntity.display();
 }
 
 function drawBossHealthBar() {
@@ -1378,8 +1425,8 @@ function keyPressed() {
         console.log("Debug mode:", Vehicle.debug);
     }
 
-    // BOSS ARENA EXCLUSIVE: DASH MECHANIC
-    if (key === ' ' && currentBoss !== null && gameState === PLAYING) {
+    // PLAYER DASH MECHANIC
+    if (key === ' ' && gameState === PLAYING) {
         if (snake && snake.dash()) {
             // Dash successful
             // We can add a sound effect here later
@@ -1387,7 +1434,46 @@ function keyPressed() {
     }
 }
 
+
 let draggedObstacle = null;
+
+// Helper for Typewriter Text
+function drawIntroText(fullText, col, shake, age, speed) {
+    push();
+    textAlign(CENTER, CENTER);
+    textStyle(BOLD);
+
+    // Calculate visible characters based on age and speed
+    // Speed: frames per character (lower is faster)
+    let charCount = floor(age / speed);
+    let visibleText = fullText.substring(0, charCount);
+
+    let x = width / 2;
+    let y = height / 2 + 180; // Moved down to clear boss head
+
+    // Dynamic Main Font Size
+    textSize(56);
+
+    if (shake) {
+        x += random(-3, 3);
+        y += random(-3, 3);
+        textSize(72); // Larger for threats
+    }
+
+    // Heavy Shadow / Outline for readability against boss
+    drawingContext.shadowBlur = 0;
+    stroke(0);
+    strokeWeight(8);
+    fill(col);
+
+    text(visibleText, x, y);
+
+    // Inner fill
+    noStroke();
+    text(visibleText, x, y);
+
+    pop();
+}
 
 function mousePressed() {
     userStartAudio(); // Resume audio context on first click
