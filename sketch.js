@@ -1,3 +1,4 @@
+console.log("🔥 SKETCH.JS LOADED (v_debug) 🔥");
 let snake;
 let foods = [];
 let particles;
@@ -26,6 +27,7 @@ let explodeSound;
 let fireShotSound;
 let hurtSound;
 let dieSound;
+let menuMusic;
 
 // Game States
 const START = 'START';
@@ -150,6 +152,10 @@ function preload() {
     fireShotSound = loadSound('assets/32. Fireshot.mp3');
     hurtSound = loadSound('assets/38. Hurt.mp3');
     dieSound = loadSound('assets/91. Die.mp3');
+    menuMusic = loadSound('assets/boss_menu_theme.mp3',
+        () => console.log("Menu Music Loaded Successfully"),
+        (err) => console.error("Menu Music Failed to Load", err)
+    );
 }
 
 function setup() {
@@ -188,18 +194,33 @@ function setup() {
 
     // --- BOSS ARENA MENU FLOW ---
     const bossArenaBtn = document.getElementById('boss-arena-btn');
+    console.log("Setup: Boss Arena Button found?", !!bossArenaBtn);
     const bossMenu = document.getElementById('boss-menu');
     const mainMenu = document.getElementById('main-menu');
     const bossBackBtn = document.getElementById('boss-back-btn');
 
     if (bossArenaBtn) bossArenaBtn.addEventListener('click', () => {
+        userStartAudio(); // Ensure audio context is ready
         mainMenu.classList.add('hidden');
         bossMenu.classList.remove('hidden');
+
+        // Loop Nuclear Flash from 1:21 (81s)
+        // Loop Nuclear Flash from 1:21 (81s)
+        if (menuMusic) {
+            console.log("Starting Boss Menu Music at 81s...");
+            if (!menuMusic.isPlaying()) {
+                menuMusic.jump(81);
+                menuMusic.loop(0, 1, 1, 81);
+            }
+        } else {
+            console.error("Menu music not loaded!");
+        }
     });
 
     if (bossBackBtn) bossBackBtn.addEventListener('click', () => {
         bossMenu.classList.add('hidden');
         mainMenu.classList.remove('hidden');
+        if (menuMusic) menuMusic.stop();
     });
 
     // Boss Selection Cards
@@ -215,6 +236,8 @@ function setup() {
 
             bossMenu.classList.add('hidden');
             document.getElementById('game-ui').classList.remove('hidden');
+
+            if (menuMusic) menuMusic.stop(); // Stop menu music on game start
             resetGame();
         });
     });
