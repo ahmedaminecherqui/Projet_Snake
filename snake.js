@@ -1,3 +1,4 @@
+console.log("🐍 SNAKE.JS LOADED (v_keyboard_fix) 🐍");
 class Snake extends Vehicle {
     constructor(x, y) {
         super(x, y);
@@ -146,6 +147,28 @@ class Snake extends Vehicle {
                 segment.position = createVector(prev.position.x + dir.x, prev.position.y + dir.y);
                 segment.velocity.mult(0.9); // Dampen velocity
             }
+        }
+    }
+
+    getKeyboardTarget() {
+        let head = this.segments[0];
+        let steeringDir = createVector(0, 0);
+
+        if (keys[keyMappings.up]) steeringDir.y -= 1;
+        if (keys[keyMappings.down]) steeringDir.y += 1;
+        if (keys[keyMappings.left]) steeringDir.x -= 1;
+        if (keys[keyMappings.right]) steeringDir.x += 1;
+
+        if (steeringDir.mag() > 0) {
+            steeringDir.normalize();
+            // Project a target point ahead of the head
+            return p5.Vector.add(head.position, steeringDir.mult(200));
+        } else {
+            // If no keys pressed, maintain current heading
+            if (head.velocity.mag() > 0.1) {
+                return p5.Vector.add(head.position, head.velocity.copy().setMag(200));
+            }
+            return head.position.copy();
         }
     }
 

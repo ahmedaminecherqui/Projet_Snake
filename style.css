@@ -752,6 +752,26 @@ canvas {
     max-width: 500px;
     width: 90%;
     box-shadow: 0 0 50px rgba(34, 211, 238, 0.2);
+    /* Make scrollable */
+    max-height: 85vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-cyan) rgba(255, 255, 255, 0.05);
+}
+
+.settings-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.settings-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.settings-content::-webkit-scrollbar-thumb {
+    background: var(--primary-cyan);
+    border-radius: 4px;
+    box-shadow: 0 0 10px var(--primary-cyan);
 }
 
 .settings-title {
@@ -849,6 +869,97 @@ canvas {
     box-shadow: 0 0 15px rgba(251, 191, 36, 0.7);
 }
 
+.settings-select {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--primary-cyan);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.5rem;
+    font-family: 'Outfit', sans-serif;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.keyboard-config {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.key-bind-btn {
+    background: rgba(34, 211, 238, 0.1);
+    border: 1px dashed var(--primary-cyan);
+    color: var(--primary-cyan);
+    padding: 0.4rem 1rem;
+    border-radius: 0.4rem;
+    font-weight: 900;
+    min-width: 100px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
+.key-bind-btn:hover {
+    background: rgba(34, 211, 238, 0.2);
+    border-style: solid;
+}
+
+.key-bind-btn.rebinding {
+    background: var(--primary-yellow);
+    color: black;
+    border-style: solid;
+    border-color: white;
+    box-shadow: 0 0 15px var(--primary-yellow);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
 .settings-actions {
     margin-top: 2rem;
 }
+
+.settings-sub-title {
+    font-size: 0.7rem;
+    color: var(--primary-yellow);
+    opacity: 0.8;
+    letter-spacing: 0.2em;
+    margin: 1.5rem 0 0.8rem 0;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.4rem;
+}
+
+.key-hint {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--primary-cyan);
+    padding: 0.2rem 0.6rem;
+    border-radius: 0.3rem;
+    font-family: monospace;
+    font-weight: 900;
+    min-width: 40px;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.keyboard-hints {
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+}
+

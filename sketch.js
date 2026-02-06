@@ -19,6 +19,21 @@ let batFlock; // Foreground bat flock system
 let musicVolume = parseFloat(localStorage.getItem('kingSnakeMusicVolume')) || 0.5;
 let sfxVolume = parseFloat(localStorage.getItem('kingSnakeSfxVolume')) || 0.7;
 
+// Control State
+let controlScheme = localStorage.getItem('kingSnakeControlScheme') || 'mouse';
+const defaultKeyMappings = {
+    up: 'ARROWUP',
+    down: 'ARROWDOWN',
+    left: 'ARROWLEFT',
+    right: 'ARROWRIGHT',
+    dash: ' ',
+    pause: 'ESCAPE',
+    debug: 'T'
+};
+let keyMappings = JSON.parse(localStorage.getItem('kingSnakeKeyMappings')) || {};
+keyMappings = { ...defaultKeyMappings, ...keyMappings };
+let rebindingKey = null; // Track which action we are currently rebinding
+
 // Assets
 let mascotImg;
 let backgroundImg;
@@ -271,6 +286,7 @@ function setup() {
         settingsBtn.addEventListener('click', () => {
             document.getElementById('main-menu').classList.add('hidden');
             settingsMenu.classList.remove('hidden');
+            updateControlUI();
         });
     }
 
@@ -409,9 +425,14 @@ function setup() {
         backToMenu();
     });
 
-    // ESC Key Handler for Pause
+    // Dynamic Key Handler for Pause
     window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
+        const pressedKey = e.key.toUpperCase();
+        const pauseKey = keyMappings.pause === 'ESCAPE' ? 'ESCAPE' : keyMappings.pause;
+
+        // p5.js 'key' usually matches e.key.toUpperCase() for alphanumeric
+        // but 'Escape' is 'ESCAPE' in p5 and e.key is 'Escape'
+        if (pressedKey === pauseKey || (e.key === 'Escape' && keyMappings.pause === 'ESCAPE')) {
             if (gameState === PLAYING) {
                 pauseGame();
             } else if (gameState === PAUSED) {
@@ -421,14 +442,41 @@ function setup() {
     });
 
     batFlock = new BatFlock();
+
+    // Controls Configuration Listeners
+    const controlSchemeSelect = document.getElementById('control-scheme');
+    if (controlSchemeSelect) {
+        controlSchemeSelect.addEventListener('change', (e) => {
+            controlScheme = e.target.value;
+            localStorage.setItem('kingSnakeControlScheme', controlScheme);
+            updateControlUI();
+        });
+    }
+
+    document.querySelectorAll('.key-bind-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Cancel any existing rebinding
+            document.querySelectorAll('.key-bind-btn').forEach(b => b.classList.remove('rebinding'));
+
+            rebindingKey = btn.getAttribute('data-key');
+            btn.classList.add('rebinding');
+            btn.innerText = 'PRESS ANY KEY...';
+        });
+    });
 }
 
 function startGame() {
     console.log("Starting Game:", currentDifficultyLevel, "Level:", currentLevel);
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
+
+    // Reset keyboard state when starting
+    keys = {};
+
     resetGame();
 }
+
+let keys = {}; // Track multiple keys for smooth steering
 
 function resetGame() {
     score = 0;
@@ -554,6 +602,25 @@ function initObstacles() {
         } while (tooClose && attempts < 100);
         obstacles.push(new Obstacle(obsPos.x, obsPos.y, random(25, 40)));
     }
+}
+
+function updateControlUI() {
+    const schemeSelect = document.getElementById('control-scheme');
+    if (schemeSelect) schemeSelect.value = controlScheme;
+
+    const kbConfig = document.getElementById('keyboard-config');
+    if (kbConfig) {
+        if (controlScheme === 'keyboard') kbConfig.classList.remove('hidden');
+        else kbConfig.classList.add('hidden');
+    }
+
+    document.querySelectorAll('.key-bind-btn').forEach(btn => {
+        const action = btn.getAttribute('data-key');
+        let label = keyMappings[action];
+        if (label === ' ') label = 'SPACE';
+        btn.innerText = label;
+        btn.classList.remove('rebinding');
+    });
 }
 
 function draw() {
@@ -897,7 +964,20 @@ function updateGame() {
     }
     updateTimerUI();
 
-    let target = createVector(mouseX, mouseY);
+    let target;
+    if (controlScheme === 'keyboard') {
+        if (typeof snake.getKeyboardTarget !== 'function') {
+            console.error("DEBUG: snake object:", snake);
+            console.error("DEBUG: snake prototype:", Object.getPrototypeOf(snake));
+            console.error("DEBUG: type of getKeyboardTarget:", typeof snake.getKeyboardTarget);
+            // Fallback to mouse to prevent crash
+            target = createVector(mouseX, mouseY);
+        } else {
+            target = snake.getKeyboardTarget();
+        }
+    } else {
+        target = createVector(mouseX, mouseY);
+    }
 
     for (let i = foods.length - 1; i >= 0; i--) {
         let f = foods[i];
@@ -1536,18 +1616,40 @@ function setupBossArena() {
 }
 
 function keyPressed() {
-    if (key === 't' || key === 'T') {
+    // 1. Handle Key Rebinding in Settings
+    if (rebindingKey) {
+        const newKey = key.toUpperCase();
+
+        // Allow rebinding to any key
+
+        keyMappings[rebindingKey] = newKey;
+        localStorage.setItem('kingSnakeKeyMappings', JSON.stringify(keyMappings));
+        rebindingKey = null;
+        updateControlUI();
+        return false; // Prevent default
+    }
+
+    // 2. Track Keys for Movement
+    keys[key.toUpperCase()] = true;
+
+    if (key.toUpperCase() === keyMappings.debug) {
         Vehicle.debug = !Vehicle.debug;
         console.log("Debug mode:", Vehicle.debug);
     }
 
-    // PLAYER DASH MECHANIC
-    if (key === ' ' && gameState === PLAYING) {
+    // 3. Pause Handling (handled by global listener above to catch it anywhere)
+    if (key.toUpperCase() === keyMappings.pause) return;
+
+    // 4. Handle Dash
+    if (key.toUpperCase() === keyMappings.dash && gameState === PLAYING) {
         if (snake && snake.dash()) {
             // Dash successful
-            // We can add a sound effect here later
         }
     }
+}
+
+function keyReleased() {
+    keys[key.toUpperCase()] = false;
 }
 
 

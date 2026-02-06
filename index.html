@@ -14,7 +14,7 @@
     <script src="obstacle.js?v=20260206_debug"></script>
     <script src="toxicSnake.js?v=20260206_debug"></script>
     <script src="food.js?v=20260206_debug"></script>
-    <script src="snake.js?v=20260206_debug"></script>
+    <script src="snake.js?v=20260206_v11"></script>
     <script src="bossRenderer.js?v=20260206_debug"></script>
     <script src="flameSerpent.js?v=20260206_debug"></script>
     <script src="batFlock.js?v=20260206_debug"></script>
@@ -74,6 +74,53 @@
                 <div class="setting-item">
                     <label for="sfx-volume">SFX Volume:</label>
                     <input type="range" id="sfx-volume" min="0" max="1" step="0.01" value="0.7">
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>CONTROLS</h3>
+                <div class="setting-item">
+                    <label for="control-scheme">Scheme:</label>
+                    <select id="control-scheme" class="settings-select">
+                        <option value="mouse">Mouse Steering</option>
+                        <option value="keyboard">Keyboard</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>Dash:</label>
+                    <button class="key-bind-btn" data-key="dash"> </button>
+                </div>
+
+                <div id="keyboard-config" class="keyboard-config hidden">
+                    <h4 class="settings-sub-title">STEERING MAPPING</h4>
+                    <div class="setting-item">
+                        <label>Up:</label>
+                        <button class="key-bind-btn" data-key="up">ARROWUP</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>Down:</label>
+                        <button class="key-bind-btn" data-key="down">ARROWDOWN</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>Left:</label>
+                        <button class="key-bind-btn" data-key="left">ARROWLEFT</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>Right:</label>
+                        <button class="key-bind-btn" data-key="right">ARROWRIGHT</button>
+                    </div>
+                </div>
+
+                <div class="keyboard-hints">
+                    <h4 class="settings-sub-title">SHORTCUTS</h4>
+                    <div class="setting-item">
+                        <label>Pause Game:</label>
+                        <button class="key-bind-btn" data-key="pause">ESC</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>Toggle Debug:</label>
+                        <button class="key-bind-btn" data-key="debug">T</button>
+                    </div>
                 </div>
             </div>
 
