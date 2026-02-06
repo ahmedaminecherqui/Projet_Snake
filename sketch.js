@@ -55,6 +55,7 @@ const PAUSED = 'PAUSED';
 const GAMEOVER = 'GAMEOVER';
 const COMPLETING = 'COMPLETING';
 const BOSS_INTRO = 'BOSS_INTRO'; // Cinematic state
+const PLAYER_DYING = 'PLAYER_DYING'; // Death animation state
 let gameState = START;
 
 let cinematicTimer = 0;
@@ -63,6 +64,8 @@ let introDialogue = null; // Decoupled rendering
 
 let completionStartTime = 0;
 let showCompleteMenuTime = 1000; // 1 second delay
+let deathStartTime = 0;
+let deathDuration = 2000; // 2 seconds delay
 
 // Difficulty Settings Level
 let currentDifficultyLevel = 'easy';
@@ -643,7 +646,7 @@ function draw() {
     }
 
     // 1. LAYER: BACKGROUND
-    if (currentBoss && (gameState === PLAYING || gameState === PAUSED || gameState === BOSS_INTRO)) {
+    if (currentBoss && (gameState === PLAYING || gameState === PAUSED || gameState === BOSS_INTRO || gameState === PLAYER_DYING)) {
         bossRenderer.drawBackground();
     } else {
         background(15, 23, 42);
@@ -669,6 +672,8 @@ function draw() {
         if (bossEntity) bossEntity.display();
     } else if (gameState === COMPLETING) {
         updateCompleting();
+    } else if (gameState === PLAYER_DYING) {
+        updatePlayerDying();
     } else if (gameState === GAMEOVER) {
         // Continue rendering particles
         if (particles) {
@@ -678,7 +683,7 @@ function draw() {
     }
 
     // 3. LAYER: FOREGROUND (Boss Arena Rocks)
-    if (currentBoss && (gameState === PLAYING || gameState === PAUSED || gameState === BOSS_INTRO)) {
+    if (currentBoss && (gameState === PLAYING || gameState === PAUSED || gameState === BOSS_INTRO || gameState === PLAYER_DYING)) {
         bossRenderer.drawForeground();
     }
 
@@ -838,6 +843,30 @@ function getWordTargets(word, snakeCounts) {
     }
 
     return allPoints;
+}
+
+function updatePlayerDying() {
+    // Render world entities but NOT the player
+    for (let f of foods) f.display(foodIconsImg);
+    for (let o of obstacles) o.display();
+    for (let ts of toxicSnakes) ts.display();
+    if (bossEntity) bossEntity.display();
+
+    // Update and display particles (the explosion)
+    if (particles) {
+        particles.update();
+        particles.display();
+    }
+
+    // Continued intense screen shake
+    if (frameCount % 4 === 0) {
+        screenShake = max(screenShake, 15);
+    }
+
+    // Timer check to finish the transition
+    if (millis() - deathStartTime > deathDuration) {
+        actualTriggerGameOver();
+    }
 }
 
 function updateCompleting() {
@@ -1344,7 +1373,28 @@ function triggerGameOver() {
         }
     } else {
         // Otherwise, it's a normal game over (or test mode)
-        actualTriggerGameOver();
+        startDeathAnimation();
+    }
+}
+
+function startDeathAnimation() {
+    if (gameState === PLAYER_DYING) return; // Prevent double trigger
+
+    if (dieSound) dieSound.play();
+    if (bossMusic) bossMusic.stop();
+
+    // Trigger Death Animation State
+    gameState = PLAYER_DYING;
+    deathStartTime = millis();
+
+    // Burst Effect
+    if (particles && snake && snake.segments.length > 0) {
+        let headPos = snake.segments[0].position;
+        // Thematic green explosion matching snake colors
+        particles.burst(headPos.x, headPos.y, color(74, 222, 128), 40); // Neon Green
+        particles.burst(headPos.x, headPos.y, color(22, 101, 52), 30);  // Dark Green
+        particles.burst(headPos.x, headPos.y, color(255), 20);          // White Highlights
+        screenShake = 30; // Massive shake
     }
 }
 
@@ -1444,9 +1494,7 @@ function takeDamage(hitPoint = null) {
     }
 
     if (lives <= 0) {
-        if (dieSound) dieSound.play();
-        if (bossMusic) bossMusic.stop();
-        triggerGameOver();
+        startDeathAnimation();
     } else {
         if (hurtSound) hurtSound.play();
     }
